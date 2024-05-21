@@ -1,7 +1,17 @@
 {
   "recommendations": [
-    "nrwl.angular-console",
+    "aaron-bond.better-comments",
+    "angular.ng-template",
+    "christian-kohler.path-intellisense",
+    "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
-    "firsttris.vscode-jest-runner"
+    "firsttris.vscode-jest-runner",
+    "formulahendry.auto-rename-tag",
+    "juanallo.vscode-dependency-cruiser",
+    "nrwl.angular-console",
+    "steoates.autoimport",
+    "streetsidesoftware.code-spell-checker",
+    "wix.glean",
+    "wix.vscode-import-cost"
   ]
 }
