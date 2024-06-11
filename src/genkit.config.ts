@@ -8,4 +8,6 @@ configureGenkit({
   enableTracingAndMetrics: true,
 });
 
-startFlowsServer();
+startFlowsServer({
+  port: Number(process.env.AI_PORT) || 4000,
+});
