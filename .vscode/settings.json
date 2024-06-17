@@ -5,6 +5,8 @@
     "bellsprout",
     "devkit",
     "fastify",
+    "Firestore",
+    "genkit",
     "nestjs",
     "nrwl",
     "pino",
