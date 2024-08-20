@@ -14,10 +14,7 @@ export class AppService {
   }
 
   async getNewsLetter(email: EmailDto): Promise<any> {
-    const res = await runFlow(defaultFlow, email.body);
-    console.log('res');
-    console.log(res);
-    return res;
+    return await runFlow(defaultFlow, email.body);
   }
 
   async getData() {

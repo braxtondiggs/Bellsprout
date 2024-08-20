@@ -9,7 +9,10 @@ export class AppController {
 
   @Post('newsletter')
   async getNewsLetter(@Body() email: EmailDto) {
-    return this.app.getNewsLetter(email);
+    const res = await this.app.getNewsLetter(email);
+    console.log('res');
+    console.log(res);
+    return res;
   }
 
   @Get('health-check')

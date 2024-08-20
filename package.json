@@ -7,6 +7,10 @@
     "build": "nx build",
     "test": "nx test"
   },
+  "engines": {
+    "npm": ">=10.0.0",
+    "node": ">=20.0.0"
+  },
   "private": true,
   "dependencies": {
     "@genkit-ai/ai": "^0.5.0",
