@@ -23,20 +23,14 @@
         "previewTargetName": "preview"
       }
     },
-    {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    },
+    { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
     {
       "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      },
+      "options": { "targetName": "test" },
       "exclude": ["e2e/**/*"]
     }
   ],
   "nxCloudAccessToken": "Y2E2MGE1MzQtOGQ5OC00NWZmLTg0OWUtZTQ1ODI2Y2Q3NmM1fHJlYWQtd3JpdGU=",
-  "useLegacyCache": true
+  "useLegacyCache": true,
+  "nxCloudId": "67aa4b9535525c71066bdb54"
 }
