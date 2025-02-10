@@ -1,7 +1,10 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -30,7 +33,5 @@
       "exclude": ["e2e/**/*"]
     }
   ],
-  "nxCloudAccessToken": "Y2E2MGE1MzQtOGQ5OC00NWZmLTg0OWUtZTQ1ODI2Y2Q3NmM1fHJlYWQtd3JpdGU=",
-  "useLegacyCache": true,
   "nxCloudId": "67aa4b9535525c71066bdb54"
 }
