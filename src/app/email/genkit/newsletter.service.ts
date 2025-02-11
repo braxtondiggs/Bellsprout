@@ -3,32 +3,29 @@ import { genkit, Genkit, z } from 'genkit';
 import openAI, { gpt4oMini } from 'genkitx-openai';
 import { logger } from 'genkit/logging';
 
-import type { NewsletterResponse } from './types/newsletter.types';
+import type { NewsletterResponse } from './newsletter.types';
 
 @Injectable()
-export class GenkitService {
+export class NewsletterGenkitService {
   private ai: Genkit;
 
   constructor() {
     logger.setLogLevel('debug');
     this.ai = genkit({
       plugins: [openAI({ apiKey: process.env.OPENAI_API_KEY })],
-      model: gpt4oMini,
+      model: gpt4oMini
     });
   }
 
   async getNewsletterFlow() {
-    return this.ai.defineFlow<any>(
-      this.NEWSLETTER_CONFIG,
-      async (content: string) => {
-        const { output } = await this.ai.generate({
-          prompt: this.NEWSLETTER_PROMPT(content),
-          output: { schema: this.NEWSLETTER_CONFIG.outputSchema },
-        });
-        console.log('response', JSON.stringify(output));
-        return output;
-      }
-    );
+    return this.ai.defineFlow<any>(this.NEWSLETTER_CONFIG, async (content: string) => {
+      const { output } = await this.ai.generate({
+        prompt: this.NEWSLETTER_PROMPT(content),
+        output: { schema: this.NEWSLETTER_CONFIG.outputSchema }
+      });
+      console.log('response', JSON.stringify(output));
+      return output;
+    });
   }
   /**
    * Generates a structured prompt for extracting information from brewery newsletters
@@ -77,7 +74,7 @@ Remember: The brewery name is mandatory and must be included in the response as 
             description: z.string().min(1),
             liveMusic: z.boolean().optional(),
             foodTrucks: z.array(z.string()).optional(),
-            happyHours: z.string().optional(),
+            happyHours: z.string().optional()
           })
         )
         .optional(),
@@ -87,7 +84,7 @@ Remember: The brewery name is mandatory and must be included in the response as 
             beerName: z.string().min(1),
             description: z.string().min(1),
             abv: z.number().min(0).max(100).optional(),
-            style: z.string().optional(),
+            style: z.string().optional()
           })
         )
         .optional(),
@@ -95,7 +92,7 @@ Remember: The brewery name is mandatory and must be included in the response as 
         .array(
           z.object({
             beerName: z.string().min(1),
-            notes: z.string().min(1),
+            notes: z.string().min(1)
           })
         )
         .optional(),
@@ -104,7 +101,7 @@ Remember: The brewery name is mandatory and must be included in the response as 
           address: z.string().optional(),
           phone: z.string().optional(),
           email: z.string().email().optional(),
-          website: z.string().url().optional(),
+          website: z.string().url().optional()
         })
         .optional(),
       hoursOfOperation: z
@@ -114,13 +111,13 @@ Remember: The brewery name is mandatory and must be included in the response as 
             .array(
               z.object({
                 date: z.coerce.date(),
-                hours: z.string(),
+                hours: z.string()
               })
             )
-            .optional(),
+            .optional()
         })
         .optional(),
-      breweryNews: z.array(z.string()).optional(),
-    }) as z.ZodType<NewsletterResponse>,
+      breweryNews: z.array(z.string()).optional()
+    }) as z.ZodType<NewsletterResponse>
   };
 }
