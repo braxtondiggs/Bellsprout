@@ -1,0 +1,1041 @@
+openapi: 3.0.3
+info:
+  title: Brewery Newsletter Digest API
+  version: 1.0.0
+  description: |
+    REST API for the Brewery Newsletter Digest application. This API enables users to manage their accounts,
+    subscribe to breweries, and receive personalized weekly digests of beer releases, events, and updates
+    from NYC and DC metropolitan area craft breweries.
+
+    ## Authentication
+    Most endpoints require JWT bearer token authentication. Obtain a token via `/auth/login`.
+
+    ## Rate Limiting
+    - Anonymous: 100 requests/hour
+    - Authenticated: 1000 requests/hour
+
+  contact:
+    name: API Support
+    email: support@brewerydigest.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+  - url: https://api.brewerydigest.com/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: Authentication and account management
+  - name: Users
+    description: User profile and preferences
+  - name: Breweries
+    description: Brewery catalog and search
+  - name: Subscriptions
+    description: User brewery subscriptions
+  - name: Digests
+    description: Digest history and preview
+  - name: Health
+    description: System health and monitoring
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================================================
+  # AUTH ENDPOINTS
+  # ============================================================================
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user account
+      description: Creates a new user account and sends verification email (FR-001, FR-002)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate user
+      description: Authenticate with email and password, returns JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify email address
+      description: Verify user email with token sent via email (FR-002)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      description: Send password reset email to user (FR-018)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent (always returns 200 for security)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If an account exists, a reset email has been sent
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      description: Reset password using token from email (FR-018)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ============================================================================
+  # USER ENDPOINTS
+  # ============================================================================
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      description: Retrieve authenticated user's profile information
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      description: Update user profile information (FR-017)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/preferences:
+    get:
+      tags: [Users]
+      summary: Get user preferences
+      description: Get digest delivery and content preferences (FR-005)
+      responses:
+        '200':
+          description: User preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Users]
+      summary: Update user preferences
+      description: Update digest preferences (delivery day, content types, format) (FR-005, FR-011, FR-013, FR-014)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/subscription:
+    patch:
+      tags: [Users]
+      summary: Manage subscription status
+      description: Pause or resume digest subscription (FR-012)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [active, paused]
+      responses:
+        '200':
+          description: Subscription status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptionStatus:
+                    type: string
+                    enum: [active, paused, cancelled]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # BREWERY ENDPOINTS
+  # ============================================================================
+
+  /breweries:
+    get:
+      tags: [Breweries]
+      summary: List breweries
+      description: Get paginated list of breweries with optional filtering (FR-003, FR-019, FR-020)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: region
+          in: query
+          description: Filter by region
+          schema:
+            type: string
+            enum: [NYC, DC]
+        - name: city
+          in: query
+          description: Filter by city
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by brewery name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of breweries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Brewery'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /breweries/{breweryId}:
+    get:
+      tags: [Breweries]
+      summary: Get brewery details
+      description: Get detailed information about a specific brewery
+      parameters:
+        - name: breweryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Brewery details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BreweryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # SUBSCRIPTION ENDPOINTS
+  # ============================================================================
+
+  /subscriptions/breweries:
+    get:
+      tags: [Subscriptions]
+      summary: Get user's brewery subscriptions
+      description: List all breweries the user is subscribed to (FR-004)
+      responses:
+        '200':
+          description: User's subscribed breweries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BrewerySubscription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Subscriptions]
+      summary: Subscribe to breweries
+      description: Add breweries to user's subscription list (FR-004)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [breweryIds]
+              properties:
+                breweryIds:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+      responses:
+        '201':
+          description: Subscriptions added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: integer
+                  subscriptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BrewerySubscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /subscriptions/breweries/{breweryId}:
+    delete:
+      tags: [Subscriptions]
+      summary: Unsubscribe from brewery
+      description: Remove brewery from user's subscription list (FR-004)
+      parameters:
+        - name: breweryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Subscription removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # DIGEST ENDPOINTS
+  # ============================================================================
+
+  /digests:
+    get:
+      tags: [Digests]
+      summary: Get user's digest history
+      description: List past digests sent to user (FR-021, FR-022)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, sent, failed, bounced]
+      responses:
+        '200':
+          description: Digest history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Digest'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /digests/{digestId}:
+    get:
+      tags: [Digests]
+      summary: Get digest details
+      description: View a specific digest with full content (FR-022)
+      parameters:
+        - name: digestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Digest details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigestDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /digests/preview:
+    get:
+      tags: [Digests]
+      summary: Preview next digest
+      description: Generate preview of what next digest would contain (FR-010)
+      responses:
+        '200':
+          description: Digest preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigestPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # HEALTH ENDPOINTS
+  # ============================================================================
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: System health status
+      security: []
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                    description: Uptime in seconds
+        '503':
+          description: System unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Check if system is ready to accept requests (database, Redis, etc.)
+      security: []
+      responses:
+        '200':
+          description: System ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: ok
+                      redis:
+                        type: string
+                        example: ok
+                      storage:
+                        type: string
+                        example: ok
+        '503':
+          description: System not ready
+
+# ============================================================================
+# COMPONENTS
+# ============================================================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Auth Schemas
+    RegisterRequest:
+      type: object
+      required: [email, password, firstName]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePass123!
+        firstName:
+          type: string
+          minLength: 1
+          example: John
+        lastName:
+          type: string
+          example: Doe
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+          format: uuid
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Token expiration in seconds
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+
+    # User Schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        emailVerified:
+          type: boolean
+        subscriptionStatus:
+          type: string
+          enum: [active, paused, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Changing email triggers verification
+
+    UserPreferences:
+      type: object
+      properties:
+        digestDeliveryDay:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Day of week (0=Sunday, 6=Saturday)
+        contentTypePreferences:
+          type: array
+          items:
+            type: string
+            enum: [release, event, update]
+        digestFormat:
+          type: string
+          enum: [brief, detailed]
+
+    UpdatePreferencesRequest:
+      type: object
+      properties:
+        digestDeliveryDay:
+          type: integer
+          minimum: 0
+          maximum: 6
+        contentTypePreferences:
+          type: array
+          items:
+            type: string
+            enum: [release, event, update]
+        digestFormat:
+          type: string
+          enum: [brief, detailed]
+
+    # Brewery Schemas
+    Brewery:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        logoUrl:
+          type: string
+          format: uri
+        city:
+          type: string
+        state:
+          type: string
+        region:
+          type: string
+          enum: [NYC, DC]
+        websiteUrl:
+          type: string
+          format: uri
+
+    BreweryDetail:
+      allOf:
+        - $ref: '#/components/schemas/Brewery'
+        - type: object
+          properties:
+            instagramHandle:
+              type: string
+            facebookHandle:
+              type: string
+            recentContent:
+              type: array
+              items:
+                $ref: '#/components/schemas/ContentItem'
+
+    BrewerySubscription:
+      type: object
+      properties:
+        id:
+          type: string
+        brewery:
+          $ref: '#/components/schemas/Brewery'
+        subscribedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+
+    # Content Schemas
+    ContentItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [release, event, update]
+        sourceType:
+          type: string
+          enum: [email, instagram, facebook, rss]
+        sourceUrl:
+          type: string
+          format: uri
+        extractedData:
+          oneOf:
+            - $ref: '#/components/schemas/BeerReleaseData'
+            - $ref: '#/components/schemas/EventData'
+            - $ref: '#/components/schemas/UpdateData'
+        publicationDate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+
+    BeerReleaseData:
+      type: object
+      properties:
+        beers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              style:
+                type: string
+              abv:
+                type: number
+              releaseDate:
+                type: string
+                format: date
+              description:
+                type: string
+
+    EventData:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              date:
+                type: string
+                format: date-time
+              location:
+                type: string
+              type:
+                type: string
+                enum: [tasting, release, tour, festival, food_pairing, live_music, trivia, other]
+              description:
+                type: string
+
+    UpdateData:
+      type: object
+      properties:
+        updates:
+          type: array
+          items:
+            type: object
+            properties:
+              summary:
+                type: string
+              category:
+                type: string
+                enum: [hours, menu, location, announcement, collaboration, awards, other]
+
+    # Digest Schemas
+    Digest:
+      type: object
+      properties:
+        id:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        deliveryDate:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+        deliveryStatus:
+          type: string
+          enum: [pending, sent, failed, bounced]
+        emailSubject:
+          type: string
+        contentCount:
+          type: object
+          properties:
+            releases:
+              type: integer
+            events:
+              type: integer
+            updates:
+              type: integer
+
+    DigestDetail:
+      allOf:
+        - $ref: '#/components/schemas/Digest'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                type: object
+                properties:
+                  brewery:
+                    $ref: '#/components/schemas/Brewery'
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentItem'
+            emailHtml:
+              type: string
+              description: Rendered HTML email content
+
+    DigestPreview:
+      type: object
+      properties:
+        contentSummary:
+          type: object
+          properties:
+            releases:
+              type: integer
+            events:
+              type: integer
+            updates:
+              type: integer
+            breweries:
+              type: integer
+        content:
+          type: array
+          items:
+            type: object
+            properties:
+              brewery:
+                $ref: '#/components/schemas/Brewery'
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContentItem'
+        estimatedDelivery:
+          type: string
+          format: date-time
+
+    # Utility Schemas
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 400
+            message: Validation failed
+            error: Bad Request
+            details:
+              - field: email
+                message: Invalid email format
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 401
+            message: Unauthorized
+            error: Authentication required
+
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 403
+            message: Forbidden
+            error: You do not have access to this resource
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 404
+            message: Not Found
+            error: The requested resource was not found
