@@ -15,7 +15,7 @@ export interface FailedJobData {
 export class FailedJobService {
   constructor(
     private readonly logger: LoggerService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {
     this.logger.setContext(FailedJobService.name);
   }
@@ -37,12 +37,12 @@ export class FailedJobService {
       });
 
       this.logger.warn(
-        `Recorded failed job: ${failedJob.queueName}/${failedJob.jobName}`,
+        `Recorded failed job: ${failedJob.queueName}/${failedJob.jobName}`
       );
     } catch (error) {
       this.logger.error(
         'Failed to record failed job',
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
     }
   }
@@ -85,7 +85,7 @@ export class FailedJobService {
   /**
    * Delete old failed jobs (cleanup)
    */
-  async cleanup(olderThanDays: number = 30): Promise<number> {
+  async cleanup(olderThanDays = 30): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
@@ -98,7 +98,7 @@ export class FailedJobService {
     });
 
     this.logger.log(
-      `Cleaned up ${result.count} failed jobs older than ${olderThanDays} days`,
+      `Cleaned up ${result.count} failed jobs older than ${olderThanDays} days`
     );
 
     return result.count;

@@ -23,17 +23,29 @@
     "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker-compose -f docker/docker-compose.yml down",
     "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
-    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d"
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "prepare": "husky"
   },
   "prisma": {
     "seed": "node -r @swc-node/register prisma/seed.ts"
   },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.json": [
+      "prettier --write"
+    ]
+  },
   "private": true,
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
   "dependencies": {
+    "@bull-board/api": "^6.14.0",
+    "@bull-board/express": "^6.14.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.2",
@@ -56,7 +68,6 @@
     "html-minifier": "^4.0.0",
     "ioredis": "^5.8.2",
     "juice": "^11.0.3",
-    "minhash": "^0.0.9",
     "minio": "^8.0.6",
     "mjml": "^4.16.1",
     "natural": "^8.1.0",
@@ -67,7 +78,6 @@
     "pino": "9.14.0",
     "pino-pretty": "^13.1.2",
     "playwright": "^1.56.1",
-    "playwright-core": "^1.56.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "reflect-metadata": "^0.1.13",
@@ -80,8 +90,6 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@eslint/js": "^9.8.0",
-    "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
     "@nx/eslint": "22.0.2",
     "@nx/eslint-plugin": "22.0.2",
@@ -104,9 +112,11 @@
     "@types/stopword": "^2.0.3",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.1.7",
     "jest": "^30.0.2",
     "jest-environment-node": "^30.0.2",
     "jest-util": "^30.0.2",
+    "lint-staged": "^16.2.6",
     "nx": "22.0.2",
     "prettier": "^2.6.2",
     "prisma": "^6.19.0",

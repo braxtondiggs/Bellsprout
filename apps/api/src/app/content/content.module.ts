@@ -16,6 +16,7 @@ import { DLQProcessor } from './jobs/dlq.processor';
 import { SocialScrapingScheduler } from './schedulers/social-scraping.scheduler';
 import { RSSScrapingScheduler } from './schedulers/rss-scraping.scheduler';
 import { QueueName } from '../../common/queues/queue.config';
+import { StorageModule } from '../../common/storage/storage.module';
 
 /**
  * Content Module
@@ -34,8 +35,10 @@ import { QueueName } from '../../common/queues/queue.config';
     BullModule.registerQueue(
       { name: QueueName.COLLECT },
       { name: QueueName.EXTRACT },
-      { name: QueueName.DEDUPLICATE },
+      { name: QueueName.DEDUPLICATE }
     ),
+    // Storage module for MinIO
+    StorageModule,
   ],
   providers: [
     ContentService,

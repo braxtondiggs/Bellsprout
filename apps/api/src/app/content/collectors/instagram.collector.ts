@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { chromium, Browser, Page } from 'playwright';
+import { addExtra } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PrismaService } from '../../../common/database/prisma.service';
 import { LoggerService } from '../../../common/services/logger.service';
+import { MinioService } from '../../../common/storage/minio.service';
 
 interface InstagramPost {
   url: string;
   caption: string;
   timestamp: Date;
-  images: string[];
+  images: string[]; // URLs to images stored in MinIO
   type: 'image' | 'carousel' | 'video';
 }
 
@@ -31,17 +34,23 @@ export class InstagramCollectorService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly logger: LoggerService,
+    private readonly minio: MinioService
   ) {
     this.logger.setContext(InstagramCollectorService.name);
   }
 
   /**
-   * Initialize browser instance
+   * Initialize browser instance with stealth plugin
    */
   private async getBrowser(): Promise<Browser> {
     if (!this.browser || !this.browser.isConnected()) {
-      this.logger.log('Launching Chromium browser');
-      this.browser = await chromium.launch({
+      this.logger.log('Launching Chromium browser with stealth mode');
+
+      // Add stealth plugin to playwright
+      const chromiumWithStealth = addExtra(chromium);
+      chromiumWithStealth.use(StealthPlugin());
+
+      this.browser = await chromiumWithStealth.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -68,7 +77,7 @@ export class InstagramCollectorService {
 
     const rateLimitHours = this.config.get<number>(
       'INSTAGRAM_RATE_LIMIT_HOURS',
-      1,
+      1
     );
 
     return hoursSinceLastScrape >= rateLimitHours;
@@ -87,9 +96,7 @@ export class InstagramCollectorService {
   async scrapeBrewery(breweryId: string): Promise<InstagramPost[]> {
     // Check rate limit
     if (!this.canScrape(breweryId)) {
-      this.logger.warn(
-        `Rate limit active for brewery ${breweryId}, skipping`,
-      );
+      this.logger.warn(`Rate limit active for brewery ${breweryId}, skipping`);
       return [];
     }
 
@@ -99,14 +106,12 @@ export class InstagramCollectorService {
     });
 
     if (!brewery?.instagramHandle) {
-      this.logger.warn(
-        `No Instagram handle found for brewery ${breweryId}`,
-      );
+      this.logger.warn(`No Instagram handle found for brewery ${breweryId}`);
       return [];
     }
 
     this.logger.log(
-      `Scraping Instagram for ${brewery.name} (@${brewery.instagramHandle})`,
+      `Scraping Instagram for ${brewery.name} (@${brewery.instagramHandle})`
     );
 
     const browser = await this.getBrowser();
@@ -123,14 +128,14 @@ export class InstagramCollectorService {
       this.updateRateLimit(breweryId);
 
       this.logger.log(
-        `Scraped ${posts.length} posts from @${brewery.instagramHandle}`,
+        `Scraped ${posts.length} posts from @${brewery.instagramHandle}`
       );
 
       return posts;
     } catch (error) {
       this.logger.error(
         `Failed to scrape Instagram for ${brewery.name}`,
-        error instanceof Error ? error.stack : undefined,
+        error instanceof Error ? error.stack : undefined
       );
       return [];
     } finally {
@@ -143,7 +148,7 @@ export class InstagramCollectorService {
    */
   private async scrapePosts(
     page: Page,
-    handle: string,
+    handle: string
   ): Promise<InstagramPost[]> {
     const url = `https://www.instagram.com/${handle}/`;
 
@@ -157,9 +162,7 @@ export class InstagramCollectorService {
 
     // Extract post data
     const posts = await page.evaluate(() => {
-      const postElements = document.querySelectorAll(
-        'article a[href*="/p/"]',
-      );
+      const postElements = document.querySelectorAll('article a[href*="/p/"]');
       const results: any[] = [];
 
       postElements.forEach((element: Element, index: number) => {
@@ -189,7 +192,66 @@ export class InstagramCollectorService {
       timestamp: new Date(now - index * 24 * 60 * 60 * 1000), // Estimate: 1 day apart
     }));
 
-    return postsWithTimestamps;
+    // Download and store images in MinIO
+    const postsWithStoredImages = await Promise.all(
+      postsWithTimestamps.map(async (post) => {
+        const storedImages = await this.downloadAndStoreImages(
+          post.images,
+          handle
+        );
+        return {
+          ...post,
+          images: storedImages,
+        };
+      })
+    );
+
+    return postsWithStoredImages;
+  }
+
+  /**
+   * Download images and store them in MinIO
+   */
+  private async downloadAndStoreImages(
+    imageUrls: string[],
+    breweryHandle: string
+  ): Promise<string[]> {
+    const storedUrls: string[] = [];
+
+    for (const imageUrl of imageUrls) {
+      try {
+        // Download image
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          this.logger.warn(`Failed to download image: ${imageUrl}`);
+          continue;
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const contentType =
+          response.headers.get('content-type') || 'image/jpeg';
+
+        // Generate filename from URL
+        const urlParts = new URL(imageUrl);
+        const filename =
+          urlParts.pathname.split('/').pop() || `${Date.now()}.jpg`;
+
+        // Store in MinIO
+        const key = this.minio.generateKey(breweryHandle, filename, 'images');
+
+        const result = await this.minio.uploadBuffer(key, buffer, contentType);
+        storedUrls.push(result.url);
+
+        this.logger.log(`Stored image in MinIO: ${key}`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to store image from ${imageUrl}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    }
+
+    return storedUrls;
   }
 
   /**
@@ -209,26 +271,22 @@ export class InstagramCollectorService {
     });
 
     this.logger.log(
-      `Found ${breweries.length} breweries with Instagram handles`,
+      `Found ${breweries.length} breweries with Instagram handles`
     );
 
     for (const brewery of breweries) {
       try {
         const posts = await this.scrapeBrewery(brewery.id);
 
-        // TODO: Queue posts for processing
-        // await this.queueService.addJob('collect', 'scrape-instagram', {
-        //   breweryId: brewery.id,
-        //   posts,
-        // });
+        // Note: This utility method returns posts but doesn't queue them.
+        // For production use, jobs are queued via SocialScrapingScheduler
+        // which calls CollectProcessor that handles storage and extraction.
 
-        this.logger.log(
-          `Scraped ${posts.length} posts from ${brewery.name}`,
-        );
+        this.logger.log(`Scraped ${posts.length} posts from ${brewery.name}`);
       } catch (error) {
         this.logger.error(
           `Error scraping ${brewery.name}`,
-          error instanceof Error ? error.stack : undefined,
+          error instanceof Error ? error.stack : undefined
         );
       }
     }

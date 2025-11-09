@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { BullBoardService } from './common/bull-board/bull-board.service';
 
 async function bootstrap() {
   // Create NestJS application with Pino logger
@@ -63,7 +64,19 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
 
-    logger.log(`Swagger documentation available at http://localhost:${port}/api/docs`);
+    logger.log(
+      `Swagger documentation available at http://localhost:${port}/api/docs`
+    );
+  }
+
+  // Bull Board dashboard (only in development)
+  if (nodeEnv !== 'production') {
+    const bullBoardService = app.get(BullBoardService);
+    app.use('/api/queues', bullBoardService.getRouter());
+
+    logger.log(
+      `Bull Board dashboard available at http://localhost:${port}/api/queues`
+    );
   }
 
   // Start server

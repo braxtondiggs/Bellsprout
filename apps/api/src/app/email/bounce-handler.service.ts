@@ -14,12 +14,9 @@ export interface BounceEvent {
  * Manages email bounce tracking and subscription pausing
  *
  * Rules:
- * - Hard bounce: Immediate pause
- * - Soft bounce: Log for future tracking (TODO: implement counter when schema is updated)
- *
- * NOTE: Full bounce tracking requires additional fields in User model:
- * - emailBounceCount: Int
- * - lastEmailBounce: DateTime
+ * - Hard bounce: Immediate pause and increment counter
+ * - Soft bounce: Increment counter, pause after 3 consecutive bounces
+ * - Successful delivery: Reset bounce counter to 0
  */
 @Injectable()
 export class BounceHandlerService {
@@ -27,7 +24,7 @@ export class BounceHandlerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly logger: LoggerService,
+    private readonly logger: LoggerService
   ) {
     this.logger.setContext(BounceHandlerService.name);
   }
@@ -39,7 +36,9 @@ export class BounceHandlerService {
     const { email, bounceType, reason } = event;
 
     this.logger.warn(
-      `Processing ${bounceType} bounce for ${email}: ${reason || 'Unknown reason'}`,
+      `Processing ${bounceType} bounce for ${email}: ${
+        reason || 'Unknown reason'
+      }`
     );
 
     try {
@@ -59,17 +58,54 @@ export class BounceHandlerService {
       }
 
       if (bounceType === 'hard') {
-        // Hard bounce: Pause immediately
-        await this.pauseUserSubscription(user.id, email, 'Hard bounce');
+        // Hard bounce: Pause immediately and record
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            subscriptionStatus: 'paused',
+            bounceCount: { increment: 1 },
+            lastBounceAt: new Date(),
+            lastBounceType: 'hard',
+          },
+        });
+
+        this.logger.warn(`Hard bounce for ${email} - subscription paused`);
       } else {
-        // Soft bounce: For now, just log it
-        // TODO: Implement bounce counter when schema is updated
-        this.logger.warn(`Soft bounce for ${email} - bounce tracking not yet implemented`);
+        // Soft bounce: Increment counter and pause if threshold reached
+        const updatedUser = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            bounceCount: { increment: 1 },
+            lastBounceAt: new Date(),
+            lastBounceType: 'soft',
+          },
+          select: {
+            bounceCount: true,
+          },
+        });
+
+        this.logger.warn(
+          `Soft bounce for ${email} - bounce count: ${updatedUser.bounceCount}/${this.SOFT_BOUNCE_THRESHOLD}`
+        );
+
+        // Pause subscription if threshold reached
+        if (updatedUser.bounceCount >= this.SOFT_BOUNCE_THRESHOLD) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+              subscriptionStatus: 'paused',
+            },
+          });
+
+          this.logger.warn(
+            `Soft bounce threshold reached for ${email} - subscription paused`
+          );
+        }
       }
     } catch (error) {
       this.logger.error(
         `Failed to handle bounce for ${email}`,
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
       throw error;
     }
@@ -81,7 +117,7 @@ export class BounceHandlerService {
   private async pauseUserSubscription(
     userId: string,
     email: string,
-    reason: string,
+    reason: string
   ): Promise<void> {
     try {
       await this.prisma.user.update({
@@ -92,12 +128,12 @@ export class BounceHandlerService {
       });
 
       this.logger.warn(
-        `Paused digest subscription for ${email} - Reason: ${reason}`,
+        `Paused digest subscription for ${email} - Reason: ${reason}`
       );
     } catch (error) {
       this.logger.error(
         `Failed to pause subscription for ${email}`,
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
       throw error;
     }
@@ -107,8 +143,23 @@ export class BounceHandlerService {
    * Reset bounce counter (called on successful delivery)
    */
   async resetBounceCounter(email: string): Promise<void> {
-    // TODO: Implement when bounce counter fields are added to User model
-    this.logger.debug(`Would reset bounce counter for ${email} (not yet implemented)`);
+    try {
+      await this.prisma.user.update({
+        where: { email },
+        data: {
+          bounceCount: 0,
+          lastBounceAt: null,
+          lastBounceType: null,
+        },
+      });
+
+      this.logger.debug(`Reset bounce counter for ${email}`);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to reset bounce counter for ${email}`,
+        error instanceof Error ? error.stack : undefined
+      );
+    }
   }
 
   /**
@@ -120,6 +171,9 @@ export class BounceHandlerService {
       select: {
         email: true,
         subscriptionStatus: true,
+        bounceCount: true,
+        lastBounceAt: true,
+        lastBounceType: true,
       },
     });
 
@@ -129,10 +183,11 @@ export class BounceHandlerService {
 
     return {
       email: user.email,
-      bounceCount: 0, // TODO: Implement when schema is updated
-      lastBounce: null, // TODO: Implement when schema is updated
+      bounceCount: user.bounceCount,
+      lastBounce: user.lastBounceAt,
+      lastBounceType: user.lastBounceType,
       isPaused: user.subscriptionStatus === 'paused',
-      isNearThreshold: false,
+      isNearThreshold: user.bounceCount >= this.SOFT_BOUNCE_THRESHOLD - 1,
     };
   }
 }

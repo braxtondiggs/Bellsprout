@@ -45,7 +45,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly ocrService: OCRService,
     private readonly llmService: LLMExtractionService,
     private readonly prisma: PrismaService,
-    @InjectQueue(QueueName.DEDUPLICATE) private readonly deduplicateQueue: Queue,
+    @InjectQueue(QueueName.DEDUPLICATE) private readonly deduplicateQueue: Queue
   ) {
     super();
     this.logger.setContext(ExtractionProcessor.name);
@@ -63,7 +63,10 @@ export class ExtractionProcessor extends WorkerHost {
           this.logger.warn(`Unknown job type: ${job.name}`);
       }
     } catch (error) {
-      this.logger.error(`Error processing ${job.name} job`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Error processing ${job.name} job`,
+        error instanceof Error ? error.stack : String(error)
+      );
       throw error; // Re-throw to trigger retry
     }
   }
@@ -72,30 +75,49 @@ export class ExtractionProcessor extends WorkerHost {
    * Extract content from email with OCR and LLM
    */
   private async extractEmail(job: Job<ExtractEmailJobData>) {
-    const { contentItemId, breweryId, breweryName, html, text, subject, from, date, attachments } = job.data;
+    const {
+      contentItemId,
+      breweryId,
+      breweryName,
+      html,
+      text,
+      subject,
+      from,
+      date,
+      attachments,
+    } = job.data;
 
-    this.logger.log(`Extracting email content for content item ${contentItemId}`);
+    this.logger.log(
+      `Extracting email content for content item ${contentItemId}`
+    );
 
     try {
       let processedHtml = html;
-      let processedText = text;
+      const processedText = text;
       const ocrResults: any[] = [];
 
       // Step 1: Process images with OCR if present
       if (attachments && attachments.length > 0) {
-        this.logger.log(`Processing ${attachments.length} image attachments with OCR`);
+        this.logger.log(
+          `Processing ${attachments.length} image attachments with OCR`
+        );
 
         // Filter for images only
         const imageBuffers = attachments
-          .filter(att => att.contentType.startsWith('image/'))
-          .map(att => att.content);
+          .filter((att) => att.contentType.startsWith('image/'))
+          .map((att) => att.content);
 
         if (imageBuffers.length > 0) {
           // Inject OCR text into HTML
-          processedHtml = await this.ocrService.injectOCRIntoHTML(html, imageBuffers);
+          processedHtml = await this.ocrService.injectOCRIntoHTML(
+            html,
+            imageBuffers
+          );
 
           // Also extract individual OCR results for metadata
-          const individualResults = await this.ocrService.extractTextFromImages(imageBuffers);
+          const individualResults = await this.ocrService.extractTextFromImages(
+            imageBuffers
+          );
 
           individualResults.forEach((result, index) => {
             ocrResults.push({
@@ -107,7 +129,9 @@ export class ExtractionProcessor extends WorkerHost {
             });
           });
 
-          this.logger.log(`OCR extracted text from ${imageBuffers.length} images`);
+          this.logger.log(
+            `OCR extracted text from ${imageBuffers.length} images`
+          );
         }
       }
 
@@ -115,7 +139,9 @@ export class ExtractionProcessor extends WorkerHost {
       const contentForLLM = processedHtml || processedText;
 
       // Step 2: Extract structured data with LLM
-      this.logger.log(`Running LLM extraction for content item ${contentItemId}`);
+      this.logger.log(
+        `Running LLM extraction for content item ${contentItemId}`
+      );
 
       const extractionResult = await this.llmService.extractContent({
         content: contentForLLM,
@@ -129,7 +155,9 @@ export class ExtractionProcessor extends WorkerHost {
       });
 
       if (!extractionResult.success) {
-        this.logger.warn(`LLM extraction failed for ${contentItemId}: ${extractionResult.error}`);
+        this.logger.warn(
+          `LLM extraction failed for ${contentItemId}: ${extractionResult.error}`
+        );
 
         // Store the error but continue with partial data
         await this.prisma.contentItem.update({
@@ -190,7 +218,9 @@ export class ExtractionProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`Updated content item ${contentItemId} with complete extraction data`);
+      this.logger.log(
+        `Updated content item ${contentItemId} with complete extraction data`
+      );
 
       // Step 4: Queue for deduplication
       await this.deduplicateQueue.add('check-duplicate', {
@@ -199,7 +229,10 @@ export class ExtractionProcessor extends WorkerHost {
 
       this.logger.log(`Queued content item ${contentItemId} for deduplication`);
     } catch (error) {
-      this.logger.error(`Failed to extract email ${contentItemId}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Failed to extract email ${contentItemId}`,
+        error instanceof Error ? error.stack : String(error)
+      );
       throw error;
     }
   }

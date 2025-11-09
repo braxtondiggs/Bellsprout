@@ -70,6 +70,9 @@ model User {
   digestDeliveryDay       Int                @default(0) // 0=Sunday, 6=Saturday
   contentTypePreferences  ContentType[]      @default([release, event, update])
   digestFormat            DigestFormat       @default(detailed)
+  bounceCount             Int                @default(0) // Track email bounce count
+  lastBounceAt            DateTime? // Last email bounce timestamp
+  lastBounceType          String? // 'hard' or 'soft'
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
@@ -247,4 +250,22 @@ model EmailBreweryMapping {
 
   @@index([emailAddress])
   @@map("email_brewery_mappings")
+}
+
+model UnknownSender {
+  id           String   @id @default(cuid())
+  emailAddress String
+  subject      String?
+  receivedAt   DateTime @default(now())
+  emailPayload Json // Store full email payload for manual review
+  resolved     Boolean  @default(false)
+  resolvedAt   DateTime?
+  breweryId    String? // Set when manually mapped to brewery
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([emailAddress])
+  @@index([resolved])
+  @@index([receivedAt])
+  @@map("unknown_senders")
 }

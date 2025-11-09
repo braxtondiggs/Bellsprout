@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { chromium, Browser, Page } from 'playwright';
+import { addExtra } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { PrismaService } from '../../../common/database/prisma.service';
 import { LoggerService } from '../../../common/services/logger.service';
+import { MinioService } from '../../../common/storage/minio.service';
 
 interface FacebookPost {
   url: string;
   content: string;
   timestamp: Date;
-  images: string[];
+  images: string[]; // URLs to images stored in MinIO
   type: 'text' | 'photo' | 'video' | 'link';
 }
 
@@ -31,17 +34,23 @@ export class FacebookCollectorService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly logger: LoggerService,
+    private readonly minio: MinioService
   ) {
     this.logger.setContext(FacebookCollectorService.name);
   }
 
   /**
-   * Initialize browser instance
+   * Initialize browser instance with stealth plugin
    */
   private async getBrowser(): Promise<Browser> {
     if (!this.browser || !this.browser.isConnected()) {
-      this.logger.log('Launching Chromium browser');
-      this.browser = await chromium.launch({
+      this.logger.log('Launching Chromium browser with stealth mode');
+
+      // Add stealth plugin to playwright
+      const chromiumWithStealth = addExtra(chromium);
+      chromiumWithStealth.use(StealthPlugin());
+
+      this.browser = await chromiumWithStealth.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -68,7 +77,7 @@ export class FacebookCollectorService {
 
     const rateLimitHours = this.config.get<number>(
       'FACEBOOK_RATE_LIMIT_HOURS',
-      1,
+      1
     );
 
     return hoursSinceLastScrape >= rateLimitHours;
@@ -87,9 +96,7 @@ export class FacebookCollectorService {
   async scrapeBrewery(breweryId: string): Promise<FacebookPost[]> {
     // Check rate limit
     if (!this.canScrape(breweryId)) {
-      this.logger.warn(
-        `Rate limit active for brewery ${breweryId}, skipping`,
-      );
+      this.logger.warn(`Rate limit active for brewery ${breweryId}, skipping`);
       return [];
     }
 
@@ -119,14 +126,14 @@ export class FacebookCollectorService {
       this.updateRateLimit(breweryId);
 
       this.logger.log(
-        `Scraped ${posts.length} posts from ${brewery.name} Facebook`,
+        `Scraped ${posts.length} posts from ${brewery.name} Facebook`
       );
 
       return posts;
     } catch (error) {
       this.logger.error(
         `Failed to scrape Facebook for ${brewery.name}`,
-        error instanceof Error ? error.stack : undefined,
+        error instanceof Error ? error.stack : undefined
       );
       return [];
     } finally {
@@ -139,7 +146,7 @@ export class FacebookCollectorService {
    */
   private async scrapePosts(
     page: Page,
-    facebookUrl: string,
+    facebookUrl: string
   ): Promise<FacebookPost[]> {
     // Navigate to page
     await page.goto(facebookUrl, { waitUntil: 'networkidle', timeout: 30000 });
@@ -165,7 +172,7 @@ export class FacebookCollectorService {
 
         // Extract text content
         const textElement = element.querySelector(
-          '[data-ad-preview="message"]',
+          '[data-ad-preview="message"]'
         );
         const content = textElement?.textContent?.trim() || '';
 
@@ -181,7 +188,9 @@ export class FacebookCollectorService {
         // Extract post link
         const linkElement = element.querySelector('a[href*="/posts/"]');
         const url = linkElement
-          ? `https://www.facebook.com${(linkElement as HTMLAnchorElement).pathname}`
+          ? `https://www.facebook.com${
+              (linkElement as HTMLAnchorElement).pathname
+            }`
           : '';
 
         if (content || images.length > 0) {
@@ -204,7 +213,66 @@ export class FacebookCollectorService {
       timestamp: new Date(now - index * 24 * 60 * 60 * 1000), // Estimate: 1 day apart
     }));
 
-    return postsWithTimestamps;
+    // Download and store images in MinIO
+    const postsWithStoredImages = await Promise.all(
+      postsWithTimestamps.map(async (post) => {
+        const storedImages = await this.downloadAndStoreImages(
+          post.images,
+          facebookUrl
+        );
+        return {
+          ...post,
+          images: storedImages,
+        };
+      })
+    );
+
+    return postsWithStoredImages;
+  }
+
+  /**
+   * Download images and store them in MinIO
+   */
+  private async downloadAndStoreImages(
+    imageUrls: string[],
+    facebookHandle: string
+  ): Promise<string[]> {
+    const storedUrls: string[] = [];
+
+    for (const imageUrl of imageUrls) {
+      try {
+        // Download image
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          this.logger.warn(`Failed to download image: ${imageUrl}`);
+          continue;
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const contentType =
+          response.headers.get('content-type') || 'image/jpeg';
+
+        // Generate filename from URL
+        const urlParts = new URL(imageUrl);
+        const filename =
+          urlParts.pathname.split('/').pop() || `${Date.now()}.jpg`;
+
+        // Store in MinIO
+        const key = this.minio.generateKey(facebookHandle, filename, 'images');
+
+        const result = await this.minio.uploadBuffer(key, buffer, contentType);
+        storedUrls.push(result.url);
+
+        this.logger.log(`Stored image in MinIO: ${key}`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to store image from ${imageUrl}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    }
+
+    return storedUrls;
   }
 
   /**
@@ -235,27 +303,21 @@ export class FacebookCollectorService {
       },
     });
 
-    this.logger.log(
-      `Found ${breweries.length} breweries with Facebook pages`,
-    );
+    this.logger.log(`Found ${breweries.length} breweries with Facebook pages`);
 
     for (const brewery of breweries) {
       try {
         const posts = await this.scrapeBrewery(brewery.id);
 
-        // TODO: Queue posts for processing
-        // await this.queueService.addJob('collect', 'scrape-facebook', {
-        //   breweryId: brewery.id,
-        //   posts,
-        // });
+        // Note: This utility method returns posts but doesn't queue them.
+        // For production use, jobs are queued via SocialScrapingScheduler
+        // which calls CollectProcessor that handles storage and extraction.
 
-        this.logger.log(
-          `Scraped ${posts.length} posts from ${brewery.name}`,
-        );
+        this.logger.log(`Scraped ${posts.length} posts from ${brewery.name}`);
       } catch (error) {
         this.logger.error(
           `Error scraping ${brewery.name}`,
-          error instanceof Error ? error.stack : undefined,
+          error instanceof Error ? error.stack : undefined
         );
       }
     }
