@@ -12,7 +12,7 @@ import { CreateContentItemDto } from './dto/create-content-item.dto';
 export class ContentService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly logger: LoggerService,
+    private readonly logger: LoggerService
   ) {
     this.logger.setContext(ContentService.name);
   }
@@ -40,13 +40,16 @@ export class ContentService {
   /**
    * Find content items by brewery
    */
-  async findByBrewery(breweryId: string, options?: {
-    limit?: number;
-    offset?: number;
-    type?: ContentType;
-    startDate?: Date;
-    endDate?: Date;
-  }) {
+  async findByBrewery(
+    breweryId: string,
+    options?: {
+      limit?: number;
+      offset?: number;
+      type?: ContentType;
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ) {
     const where: Prisma.ContentItemWhereInput = {
       breweryId,
       isDuplicate: false, // Only non-duplicate items
@@ -87,7 +90,7 @@ export class ContentService {
    * Find content items for digest generation
    * Gets non-duplicate content from the last N days for specific breweries
    */
-  async findForDigest(breweryIds: string[], daysBack: number = 7) {
+  async findForDigest(breweryIds: string[], daysBack = 7) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
@@ -119,7 +122,9 @@ export class ContentService {
    * Mark content item as duplicate
    */
   async markAsDuplicate(contentItemId: string, duplicateOfId: string) {
-    this.logger.log(`Marking content ${contentItemId} as duplicate of ${duplicateOfId}`);
+    this.logger.log(
+      `Marking content ${contentItemId} as duplicate of ${duplicateOfId}`
+    );
 
     return this.prisma.contentItem.update({
       where: { id: contentItemId },
@@ -153,10 +158,10 @@ export class ContentService {
     return {
       total,
       byType: Object.fromEntries(
-        byType.map(item => [item.type, item._count])
+        byType.map((item) => [item.type, item._count])
       ),
       bySource: Object.fromEntries(
-        bySource.map(item => [item.sourceType, item._count])
+        bySource.map((item) => [item.sourceType, item._count])
       ),
     };
   }

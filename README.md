@@ -176,39 +176,12 @@ See `.env.example` for all available configuration options.
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-### Production (Coolify)
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
+## 🤖 Content Extraction
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
-
-## 🔄 CI/CD Pipeline
-
-The project uses GitHub Actions for CI/CD:
-
-- **On every push/PR**: Lint, test, and build
-- **On push to main/master**: Build Docker image, push to registry, deploy to Coolify
-
-See [.github/workflows/ci.yml](.github/workflows/ci.yml) for details.
-
-## 🤖 AI Features
-
-### Claude PR Review
-Automatic PR reviews using Claude Sonnet 4. See [.github/workflows/claude-pr-review.yml](.github/workflows/claude-pr-review.yml)
-
-### Content Extraction
 Uses Claude to extract structured data from brewery posts:
 - Beer releases (name, style, ABV, release date)
 - Events (name, date, location, description)
 - General updates and announcements
-
-## 📚 Documentation
-
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment guide for Coolify
-- [AGENTS.md](./AGENTS.md) - AI agent workflows
-- [RESEND_SETUP.md](./RESEND_SETUP.md) - Email service setup
-- [specs/](./specs/) - Feature specifications and planning
 
 ## 🛠️ Tech Stack
 
@@ -246,14 +219,6 @@ npx nx run-many -t lint --all
 # Show project details
 npx nx show project api
 ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## 📄 License
 

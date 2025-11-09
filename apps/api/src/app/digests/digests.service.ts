@@ -11,7 +11,7 @@ import { DigestFilterDto, DigestResponseDto } from './dto/digest-response.dto';
 export class DigestService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly logger: LoggerService,
+    private readonly logger: LoggerService
   ) {
     this.logger.setContext(DigestService.name);
   }
@@ -40,7 +40,14 @@ export class DigestService {
    * Find digests with optional filtering
    */
   async findMany(filter: DigestFilterDto): Promise<DigestResponseDto[]> {
-    const { userId, deliveryStatus, startDate, endDate, limit = 10, offset = 0 } = filter;
+    const {
+      userId,
+      deliveryStatus,
+      startDate,
+      endDate,
+      limit = 10,
+      offset = 0,
+    } = filter;
 
     const digests = await this.prisma.digest.findMany({
       where: {
@@ -63,6 +70,15 @@ export class DigestService {
             digestContent: true,
           },
         },
+        digestContent: {
+          include: {
+            contentItem: {
+              select: {
+                breweryId: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -71,17 +87,24 @@ export class DigestService {
       skip: offset,
     });
 
-    return digests.map((digest) => ({
-      id: digest.id,
-      userId: digest.userId,
-      deliveryStatus: digest.deliveryStatus as 'pending' | 'sent' | 'failed',
-      deliveryDate: digest.deliveryDate,
-      contentItemsCount: digest._count.digestContent,
-      breweriesCount: 0, // TODO: Calculate from digestContent
-      generatedAt: digest.generatedAt,
-      sentAt: digest.sentAt,
-      createdAt: digest.createdAt,
-    }));
+    return digests.map((digest) => {
+      // Calculate unique brewery count from digest content
+      const uniqueBreweryIds = new Set(
+        digest.digestContent.map((dc) => dc.contentItem.breweryId)
+      );
+
+      return {
+        id: digest.id,
+        userId: digest.userId,
+        deliveryStatus: digest.deliveryStatus as 'pending' | 'sent' | 'failed',
+        deliveryDate: digest.deliveryDate,
+        contentItemsCount: digest._count.digestContent,
+        breweriesCount: uniqueBreweryIds.size,
+        generatedAt: digest.generatedAt,
+        sentAt: digest.sentAt,
+        createdAt: digest.createdAt,
+      };
+    });
   }
 
   /**
@@ -118,7 +141,7 @@ export class DigestService {
   async updateDeliveryStatus(
     id: string,
     status: 'pending' | 'sent' | 'failed',
-    deliveryDate?: Date,
+    deliveryDate?: Date
   ) {
     return await this.prisma.digest.update({
       where: { id },
@@ -141,7 +164,9 @@ export class DigestService {
       skipDuplicates: true,
     });
 
-    this.logger.log(`Added ${contentItemIds.length} content items to digest ${digestId}`);
+    this.logger.log(
+      `Added ${contentItemIds.length} content items to digest ${digestId}`
+    );
   }
 
   /**

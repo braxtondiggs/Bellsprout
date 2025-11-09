@@ -1,5 +1,12 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, IsNumber, IsEnum, IsOptional, validateSync, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  validateSync,
+  IsBoolean,
+} from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -14,7 +21,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  PORT: number = 3000;
+  PORT = 3000;
 
   // Database
   @IsString()
@@ -23,11 +30,11 @@ class EnvironmentVariables {
   // Redis
   @IsString()
   @IsOptional()
-  REDIS_HOST: string = 'localhost';
+  REDIS_HOST = 'localhost';
 
   @IsNumber()
   @IsOptional()
-  REDIS_PORT: number = 6379;
+  REDIS_PORT = 6379;
 
   @IsString()
   @IsOptional()
@@ -35,7 +42,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  REDIS_DB: number = 0;
+  REDIS_DB = 0;
 
   // JWT
   @IsString()
@@ -43,7 +50,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_EXPIRES_IN: string = '7d';
+  JWT_EXPIRES_IN = '7d';
 
   // Resend Email Service
   @IsString()
@@ -52,11 +59,11 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  EMAIL_FROM: string = 'noreply@brewdigest.com';
+  EMAIL_FROM = 'noreply@brewdigest.com';
 
   @IsString()
   @IsOptional()
-  APP_BASE_URL: string = 'http://localhost:3000';
+  APP_BASE_URL = 'http://localhost:3000';
 
   @IsString()
   @IsOptional()
@@ -68,7 +75,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  OPENAI_MODEL: string = 'gpt-4o-mini';
+  OPENAI_MODEL = 'gpt-4o-mini';
 
   // MinIO (optional)
   @IsString()
@@ -103,7 +110,7 @@ class EnvironmentVariables {
   // Frontend URL (for email links)
   @IsString()
   @IsOptional()
-  FRONTEND_URL: string = 'http://localhost:4200';
+  FRONTEND_URL = 'http://localhost:4200';
 }
 
 export function configValidation(config: Record<string, unknown>) {
