@@ -1,0 +1,250 @@
+// Prisma schema for Brewery Newsletter Digest Application
+// Generated from: specs/001-brewery-digest/data-model.md
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto]
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SubscriptionStatus {
+  active
+  paused
+  cancelled
+}
+
+enum DigestFormat {
+  brief
+  detailed
+}
+
+enum ContentType {
+  release
+  event
+  update
+}
+
+enum SourceType {
+  email
+  instagram
+  facebook
+  rss
+}
+
+enum Region {
+  NYC
+  DC
+}
+
+enum DeliveryStatus {
+  pending
+  sent
+  failed
+  bounced
+}
+
+// ============================================================================
+// USER DOMAIN
+// ============================================================================
+
+model User {
+  id                      String             @id @default(cuid())
+  email                   String             @unique
+  passwordHash            String
+  firstName               String?
+  lastName                String?
+  emailVerified           Boolean            @default(false)
+  emailVerificationToken  String?            @unique
+  passwordResetToken      String?            @unique
+  passwordResetExpiry     DateTime?
+  subscriptionStatus      SubscriptionStatus @default(active)
+  digestDeliveryDay       Int                @default(0) // 0=Sunday, 6=Saturday
+  contentTypePreferences  ContentType[]      @default([release, event, update])
+  digestFormat            DigestFormat       @default(detailed)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  // Relationships
+  brewerySubscriptions UserBrewerySubscription[]
+  digests              Digest[]
+
+  @@index([email])
+  @@index([emailVerified])
+  @@index([subscriptionStatus])
+  @@map("users")
+}
+
+// ============================================================================
+// BREWERY DOMAIN
+// ============================================================================
+
+model Brewery {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String?  @db.Text
+  logoUrl         String?
+  city            String
+  state           String
+  region          Region
+  websiteUrl      String?
+  emailDomain     String?
+  instagramHandle String?
+  facebookHandle  String?
+  rssFeedUrl      String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  contentItems      ContentItem[]
+  userSubscriptions UserBrewerySubscription[]
+  emailMappings     EmailBreweryMapping[]
+
+  @@index([name])
+  @@index([city, state])
+  @@index([region])
+  @@index([slug])
+  @@index([isActive])
+  @@map("breweries")
+}
+
+model UserBrewerySubscription {
+  id           String   @id @default(cuid())
+  userId       String
+  breweryId    String
+  subscribedAt DateTime @default(now())
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brewery Brewery @relation(fields: [breweryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, breweryId])
+  @@index([userId])
+  @@index([breweryId])
+  @@index([isActive])
+  @@map("user_brewery_subscriptions")
+}
+
+// ============================================================================
+// CONTENT DOMAIN
+// ============================================================================
+
+model ContentItem {
+  id               String      @id @default(cuid())
+  breweryId        String
+  type             ContentType
+  sourceType       SourceType
+  sourceUrl        String?     @db.Text
+  rawContent       String      @db.Text
+  extractedData    Json        @default("{}")
+  publicationDate  DateTime    @db.Date
+  minhashSignature Bytes?
+  isDuplicate      Boolean     @default(false)
+  duplicateOfId    String?
+  confidenceScore  Float?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relationships
+  brewery       Brewery         @relation(fields: [breweryId], references: [id], onDelete: Cascade)
+  duplicateOf   ContentItem?    @relation("ContentDuplicates", fields: [duplicateOfId], references: [id])
+  duplicates    ContentItem[]   @relation("ContentDuplicates")
+  digestContent DigestContent[]
+
+  @@index([breweryId, publicationDate])
+  @@index([publicationDate])
+  @@index([type])
+  @@index([sourceType])
+  @@index([isDuplicate])
+  @@index([minhashSignature])
+  @@map("content_items")
+}
+
+// ============================================================================
+// DIGEST DOMAIN
+// ============================================================================
+
+model Digest {
+  id             String         @id @default(cuid())
+  userId         String
+  generatedAt    DateTime       @default(now())
+  deliveryDate   DateTime
+  sentAt         DateTime?
+  deliveryStatus DeliveryStatus @default(pending)
+  emailSubject   String
+  emailHtml      String         @db.Text
+  openedAt       DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relationships
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  digestContent DigestContent[]
+
+  @@index([userId])
+  @@index([deliveryDate])
+  @@index([deliveryStatus])
+  @@index([sentAt])
+  @@map("digests")
+}
+
+model DigestContent {
+  id            String @id @default(cuid())
+  digestId      String
+  contentItemId String
+  sortOrder     Int    @default(0)
+
+  // Relationships
+  digest      Digest      @relation(fields: [digestId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([digestId, contentItemId])
+  @@index([digestId])
+  @@index([contentItemId])
+  @@map("digest_content")
+}
+
+// ============================================================================
+// UTILITY MODELS
+// ============================================================================
+
+model FailedJob {
+  id           String   @id @default(cuid())
+  queueName    String
+  jobName      String
+  jobData      Json
+  error        String   @db.Text
+  stackTrace   String?  @db.Text
+  attemptsMade Int
+  createdAt    DateTime @default(now())
+
+  @@index([queueName])
+  @@index([jobName])
+  @@index([createdAt])
+  @@map("failed_jobs")
+}
+
+model EmailBreweryMapping {
+  id           String   @id @default(cuid())
+  emailAddress String   @unique
+  breweryId    String
+  createdAt    DateTime @default(now())
+
+  brewery Brewery @relation(fields: [breweryId], references: [id], onDelete: Cascade)
+
+  @@index([emailAddress])
+  @@map("email_brewery_mappings")
+}

@@ -1,0 +1,27 @@
+<div class="update" style="margin-bottom: 20px; padding: 16px; border-left: 4px solid #ff9800; background-color: #f9f9f9;">
+  <div class="update-title" style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px;">
+    {{title}}
+  </div>
+
+  {{#if category}}
+  <div class="update-category" style="font-size: 12px; color: #888888; margin-bottom: 8px;">
+    <span style="display: inline-block; padding: 2px 8px; background-color: #fff3e0; color: #e65100; border-radius: 3px;">
+      {{uppercase category}}
+    </span>
+  </div>
+  {{/if}}
+
+  <div class="update-content" style="font-size: 14px; color: #333333; line-height: 1.6;">
+    {{content}}
+  </div>
+
+  {{#if urls}}
+  <div style="margin-top: 12px;">
+    {{#each urls}}
+    <a href="{{this}}" style="display: inline-block; padding: 8px 16px; background-color: #ff9800; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600; margin-right: 8px; margin-bottom: 8px;">
+      Learn More
+    </a>
+    {{/each}}
+  </div>
+  {{/if}}
+</div>
