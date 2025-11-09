@@ -1,0 +1,41 @@
+<div class="beer-release" style="margin-bottom: 20px; padding: 16px; border-left: 4px solid #1a73e8; background-color: #f9f9f9;">
+  <div class="beer-name" style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
+    {{name}}
+  </div>
+
+  {{#if style}}
+  <div class="beer-style" style="font-size: 14px; color: #666666; font-style: italic; margin-bottom: 8px;">
+    {{style}}
+  </div>
+  {{/if}}
+
+  {{#if description}}
+  <div class="beer-description" style="font-size: 14px; color: #333333; margin-bottom: 8px;">
+    {{description}}
+  </div>
+  {{/if}}
+
+  <div class="beer-details" style="font-size: 13px; color: #888888;">
+    {{#if abv}}
+    <span>ABV: {{formatAbv abv}}</span>
+    {{/if}}
+    {{#if ibu}}
+    {{#if abv}}<span> • </span>{{/if}}
+    <span>IBU: {{ibu}}</span>
+    {{/if}}
+    {{#if availability}}
+    {{#if (or abv ibu)}}<span> • </span>{{/if}}
+    <span>{{uppercase availability}}</span>
+    {{/if}}
+    {{#if price}}
+    {{#if (or abv ibu availability)}}<span> • </span>{{/if}}
+    <span>{{price}}</span>
+    {{/if}}
+  </div>
+
+  {{#if releaseDate}}
+  <div class="release-date" style="font-size: 12px; color: #1a73e8; margin-top: 8px;">
+    Release Date: {{formatShortDate releaseDate}}
+  </div>
+  {{/if}}
+</div>

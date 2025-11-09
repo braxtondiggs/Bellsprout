@@ -1,0 +1,97 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    name: Review PR with Claude
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: pr-diff
+        run: |
+          # Fetch the base branch
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
+          # Get the diff
+          DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD)
+
+          # Save diff to file for Claude to review
+          echo "$DIFF" > pr-diff.txt
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
+          echo "$CHANGED_FILES" > changed-files.txt
+
+      - name: Review with Claude
+        id: claude-review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Read the diff
+          DIFF=$(cat pr-diff.txt)
+          CHANGED_FILES=$(cat changed-files.txt)
+
+          # Create prompt for Claude
+          PROMPT="Please review this pull request and provide feedback on:
+
+          1. Code quality and best practices
+          2. Potential bugs or issues
+          3. Security concerns
+          4. Performance implications
+          5. Suggestions for improvement
+
+          Changed files:
+          ${CHANGED_FILES}
+
+          Diff:
+          ${DIFF}"
+
+          # Call Claude API
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -d '{
+              "model": "claude-sonnet-4-20250514",
+              "max_tokens": 4096,
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "'"${PROMPT}"'"
+                }
+              ]
+            }')
+
+          # Extract the review content
+          REVIEW=$(echo "$RESPONSE" | jq -r '.content[0].text')
+
+          # Save to file
+          echo "$REVIEW" > review.txt
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.txt', 'utf8');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🤖 Claude PR Review\n\n${review}\n\n---\n*Powered by Claude Sonnet 4*`
+            });

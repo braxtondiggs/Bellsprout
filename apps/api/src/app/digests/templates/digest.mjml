@@ -1,0 +1,142 @@
+<mjml>
+  <mj-head>
+    <mj-title>Your Weekly Brewery Digest</mj-title>
+    <mj-preview>New beers, events, and updates from your favorite breweries</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" />
+      <mj-text font-size="14px" color="#333333" line-height="1.6" />
+      <mj-button background-color="#1a73e8" color="#ffffff" font-size="14px" font-weight="600" border-radius="4px" />
+    </mj-attributes>
+    <mj-style>
+      .brewery-name { font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; }
+      .section-title { font-size: 18px; font-weight: 600; color: #1a73e8; margin: 24px 0 12px 0; border-bottom: 2px solid #1a73e8; padding-bottom: 4px; }
+      .beer-name { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+      .beer-style { font-size: 14px; color: #666666; font-style: italic; }
+      .beer-details { font-size: 13px; color: #888888; }
+      .event-name { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+      .event-date { font-size: 14px; color: #1a73e8; font-weight: 500; }
+      .update-title { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+      .item-divider { border-top: 1px solid #e0e0e0; margin: 16px 0; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f5f5f5">
+    <!-- Header -->
+    <mj-section background-color="#1a73e8" padding="20px">
+      <mj-column>
+        <mj-text align="center" color="#ffffff" font-size="28px" font-weight="700">
+          🍺 Your Weekly Brewery Digest
+        </mj-text>
+        <mj-text align="center" color="#ffffff" font-size="14px">
+          {{formatDate period.start}} - {{formatDate period.end}}
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Greeting -->
+    <mj-section background-color="#ffffff" padding="20px 20px 10px 20px">
+      <mj-column>
+        <mj-text font-size="16px">
+          Hi {{user.firstName}},
+        </mj-text>
+        <mj-text>
+          Here's what's happening at your favorite breweries this week. We found <strong>{{totalItems}}</strong> updates from <strong>{{breweries.length}}</strong> {{pluralize breweries.length "brewery" "breweries"}}.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Breweries Loop -->
+    {{#each breweries}}
+    <mj-section background-color="#ffffff" padding="30px 20px">
+      <mj-column>
+        <!-- Brewery Header -->
+        {{#if logoUrl}}
+        <mj-image src="{{logoUrl}}" alt="{{name}}" width="80px" align="left" padding="0 0 16px 0" />
+        {{/if}}
+        <mj-text css-class="brewery-name">{{name}}</mj-text>
+
+        <!-- Beer Releases -->
+        {{#if (hasItems releases)}}
+        <mj-text css-class="section-title">🍻 New Releases</mj-text>
+        {{#each releases}}
+        <mj-text css-class="beer-name">{{name}}</mj-text>
+        {{#if style}}
+        <mj-text css-class="beer-style">{{style}}</mj-text>
+        {{/if}}
+        {{#if description}}
+        <mj-text padding="4px 0">{{description}}</mj-text>
+        {{/if}}
+        <mj-text css-class="beer-details">
+          {{#if abv}}ABV: {{formatAbv abv}}{{/if}}
+          {{#if ibu}}{{#if abv}} • {{/if}}IBU: {{ibu}}{{/if}}
+          {{#if availability}}{{#if (or abv ibu)}} • {{/if}}{{uppercase availability}}{{/if}}
+          {{#if price}}{{#if (or abv ibu availability)}} • {{/if}}{{price}}{{/if}}
+        </mj-text>
+        {{#unless @last}}
+        <mj-divider border-color="#e0e0e0" padding="16px 0" />
+        {{/unless}}
+        {{/each}}
+        {{/if}}
+
+        <!-- Events -->
+        {{#if (hasItems events)}}
+        <mj-text css-class="section-title">📅 Upcoming Events</mj-text>
+        {{#each events}}
+        <mj-text css-class="event-name">{{name}}</mj-text>
+        <mj-text css-class="event-date">{{date}}{{#if time}} at {{time}}{{/if}}</mj-text>
+        {{#if description}}
+        <mj-text padding="4px 0">{{truncate description 200}}</mj-text>
+        {{/if}}
+        {{#if location}}
+        <mj-text font-size="13px" color="#666666">📍 {{location}}</mj-text>
+        {{/if}}
+        {{#if ticketUrl}}
+        <mj-button href="{{ticketUrl}}" padding="12px 0">Get Tickets</mj-button>
+        {{/if}}
+        {{#unless @last}}
+        <mj-divider border-color="#e0e0e0" padding="16px 0" />
+        {{/unless}}
+        {{/each}}
+        {{/if}}
+
+        <!-- Updates -->
+        {{#if (hasItems updates)}}
+        <mj-text css-class="section-title">📢 Updates</mj-text>
+        {{#each updates}}
+        <mj-text css-class="update-title">{{title}}</mj-text>
+        <mj-text padding="4px 0">{{content}}</mj-text>
+        {{#if urls}}
+        {{#each urls}}
+        <mj-button href="{{this}}" padding="12px 0" font-size="12px">Learn More</mj-button>
+        {{/each}}
+        {{/if}}
+        {{#unless @last}}
+        <mj-divider border-color="#e0e0e0" padding="16px 0" />
+        {{/unless}}
+        {{/each}}
+        {{/if}}
+      </mj-column>
+    </mj-section>
+
+    {{#unless @last}}
+    <mj-section background-color="#f5f5f5" padding="0">
+      <mj-column>
+        <mj-divider border-color="#cccccc" border-width="2px" />
+      </mj-column>
+    </mj-section>
+    {{/unless}}
+    {{/each}}
+
+    <!-- Footer -->
+    <mj-section background-color="#ffffff" padding="30px 20px">
+      <mj-column>
+        <mj-text align="center">
+          <a href="{{preferencesUrl}}" style="color: #1a73e8; text-decoration: none;">Manage Preferences</a>
+        </mj-text>
+        <mj-text align="center" font-size="12px" color="#999999">
+          You're receiving this because you subscribed to brewery updates.
+          <a href="{{unsubscribeUrl}}" style="color: #999999;">Unsubscribe</a>
+        </mj:text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

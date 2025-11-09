@@ -1,4 +1,4 @@
-# Feature Specification: Brewery Newsletter Digest Application
+# Feature Specification: Brew Digest
 
 **Feature Branch**: `001-brewery-digest`
 **Created**: 2025-11-07

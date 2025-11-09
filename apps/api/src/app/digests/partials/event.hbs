@@ -1,0 +1,47 @@
+<div class="event" style="margin-bottom: 20px; padding: 16px; border-left: 4px solid #4caf50; background-color: #f9f9f9;">
+  <div class="event-name" style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
+    {{name}}
+  </div>
+
+  <div class="event-date" style="font-size: 14px; color: #4caf50; font-weight: 500; margin-bottom: 8px;">
+    {{date}}{{#if time}} at {{time}}{{/if}}
+  </div>
+
+  {{#if description}}
+  <div class="event-description" style="font-size: 14px; color: #333333; margin-bottom: 8px;">
+    {{truncate description 200}}
+  </div>
+  {{/if}}
+
+  {{#if location}}
+  <div class="event-location" style="font-size: 13px; color: #666666; margin-bottom: 8px;">
+    📍 {{location}}
+  </div>
+  {{/if}}
+
+  <div class="event-meta" style="font-size: 12px; color: #888888;">
+    {{#if eventType}}
+    <span style="display: inline-block; padding: 2px 8px; background-color: #e8f5e9; color: #2e7d32; border-radius: 3px; margin-right: 8px;">
+      {{uppercase eventType}}
+    </span>
+    {{/if}}
+    {{#if isFree}}
+    <span style="display: inline-block; padding: 2px 8px; background-color: #fff3e0; color: #ef6c00; border-radius: 3px; margin-right: 8px;">
+      FREE
+    </span>
+    {{/if}}
+    {{#if rsvpRequired}}
+    <span style="display: inline-block; padding: 2px 8px; background-color: #fce4ec; color: #c2185b; border-radius: 3px;">
+      RSVP REQUIRED
+    </span>
+    {{/if}}
+  </div>
+
+  {{#if ticketUrl}}
+  <div style="margin-top: 12px;">
+    <a href="{{ticketUrl}}" style="display: inline-block; padding: 10px 20px; background-color: #4caf50; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 600;">
+      Get Tickets
+    </a>
+  </div>
+  {{/if}}
+</div>

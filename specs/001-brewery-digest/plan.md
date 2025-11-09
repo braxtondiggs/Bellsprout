@@ -1,4 +1,4 @@
-# Implementation Plan: Brewery Newsletter Digest Application
+# Implementation Plan: Brew Digest
 
 **Branch**: `001-brewery-digest` | **Date**: 2025-11-07 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-brewery-digest/spec.md`

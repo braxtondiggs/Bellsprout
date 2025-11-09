@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>No Updates This Week</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: #ffffff;
+      border-radius: 8px;
+      padding: 40px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      color: #1a73e8;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    .content {
+      font-size: 16px;
+      margin-bottom: 30px;
+    }
+    .cta {
+      text-align: center;
+      margin: 30px 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 30px;
+      background-color: #1a73e8;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🍺</div>
+      <h1>No Updates This Week</h1>
+    </div>
+
+    <div class="content">
+      <p>Hi {{name}},</p>
+
+      <p>We checked all your favorite breweries this week, but there weren't any new releases, events, or updates to share.</p>
+
+      <p>Don't worry — we're still watching! When there's news worth sharing, we'll send you a digest with all the details.</p>
+
+      <p>In the meantime, why not explore some new breweries to follow?</p>
+    </div>
+
+    <div class="cta">
+      <a href="{{browseBreweriesUrl}}" class="button">Browse Breweries</a>
+    </div>
+
+    <div class="footer">
+      <p>&copy; {{currentYear}} Brewery Digest. All rights reserved.</p>
+      <p>
+        <a href="{{preferencesUrl}}" style="color: #999;">Manage Preferences</a> •
+        <a href="{{unsubscribeUrl}}" style="color: #999;">Unsubscribe</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
