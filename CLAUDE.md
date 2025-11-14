@@ -26,7 +26,7 @@ If the user wants help with fixing an error in their CI pipeline, use the follow
 
 This is a NestJS-based brewery newsletter aggregation platform that:
 - Collects content from multiple sources (RSS, social media, emails)
-- Uses AI (Claude) for content extraction and categorization
+- Uses AI (GPT-4o-mini) for content extraction and categorization
 - Sends personalized weekly digests to subscribers
 
 ## Architecture & Tech Stack
@@ -36,7 +36,7 @@ This is a NestJS-based brewery newsletter aggregation platform that:
 - **Database**: PostgreSQL 16 + Prisma ORM
 - **Queue/Cache**: Redis 7 + BullMQ
 - **Email**: Resend API
-- **AI**: Anthropic Claude (Sonnet 4)
+- **AI**: OpenAI (GPT-4o-mini)
 - **Scraping**: Playwright for social media
 - **Templates**: MJML + Handlebars for email rendering
 - **Deployment**: Docker + Coolify
@@ -136,8 +136,8 @@ module-name/
    - Use `ConfigService` for accessing environment variables
 
 3. **AI Integration**
-   - Claude API calls are in `content/processors/llm-extraction.service.ts`
-   - Uses Anthropic SDK with Sonnet 4 model
+   - OpenAI API calls are in `content/processors/llm-extraction.service.ts`
+   - Uses OpenAI SDK with GPT-4o-mini model
    - Extracts structured data: beer releases, events, updates
 
 4. **Email Templates**

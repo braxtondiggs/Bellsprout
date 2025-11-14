@@ -11,7 +11,7 @@ A NestJS-based newsletter application that aggregates craft brewery content from
   - OCR for image-based content
 
 - **AI-Powered Content Processing**
-  - LLM extraction using Claude (Anthropic)
+  - LLM extraction using GPT-4o-mini (OpenAI)
   - Intelligent duplicate detection
   - Automated categorization (beer releases, events, updates)
 
@@ -156,8 +156,8 @@ REDIS_PORT=6379
 RESEND_API_KEY=your_key_here
 RESEND_FROM_EMAIL=noreply@yourdomain.com
 
-# AI (Anthropic Claude)
-ANTHROPIC_API_KEY=your_key_here
+# AI (OpenAI)
+OPENAI_API_KEY=your_key_here
 
 # Authentication
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
@@ -178,7 +178,7 @@ docker-compose -f docker/docker-compose.yml up -d
 
 ## 🤖 Content Extraction
 
-Uses Claude to extract structured data from brewery posts:
+Uses GPT-4o-mini to extract structured data from brewery posts:
 - Beer releases (name, style, ABV, release date)
 - Events (name, date, location, description)
 - General updates and announcements
@@ -192,7 +192,7 @@ Uses Claude to extract structured data from brewery posts:
 - **Cache/Queue**: Redis 7 + BullMQ
 - **Storage**: MinIO (S3-compatible)
 - **Email**: Resend
-- **AI**: Anthropic Claude (Sonnet 4)
+- **AI**: OpenAI (GPT-4o-mini)
 - **Web Scraping**: Playwright
 - **Email Templates**: MJML + Handlebars
 - **Monorepo**: Nx 22
@@ -229,4 +229,4 @@ MIT
 - [Nx Documentation](https://nx.dev)
 - [NestJS Documentation](https://docs.nestjs.com)
 - [Prisma Documentation](https://www.prisma.io/docs)
-- [Anthropic Claude](https://www.anthropic.com/claude)
+- [OpenAI API](https://platform.openai.com/docs)

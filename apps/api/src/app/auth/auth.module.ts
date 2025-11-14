@@ -7,20 +7,27 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { EmailModule } from '../email/email.module';
+import { LoggerModule } from '../../common/services/logger.module';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'default-secret-change-in-production',
-        signOptions: {
-          expiresIn: '7d',
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const expiresIn = configService.get('JWT_EXPIRES_IN', '7d');
+        return {
+          secret:
+            configService.get<string>('JWT_SECRET') ||
+            'default-secret-change-in-production',
+          signOptions: {
+            expiresIn,
+          },
+        };
+      },
     }),
     forwardRef(() => EmailModule),
+    LoggerModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],

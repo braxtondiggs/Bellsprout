@@ -15,18 +15,26 @@ export class EmailService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly logger: LoggerService,
+    private readonly logger: LoggerService
   ) {
     this.logger.setContext(EmailService.name);
 
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not configured - email sending disabled');
+      this.logger.warn(
+        'RESEND_API_KEY not configured - email sending disabled'
+      );
     }
 
     this.resend = new Resend(apiKey);
-    this.fromEmail = this.configService.get<string>('EMAIL_FROM', 'noreply@brewerydigest.com');
-    this.baseUrl = this.configService.get<string>('APP_BASE_URL', 'http://localhost:3000');
+    this.fromEmail = this.configService.get<string>(
+      'RESEND_FROM_EMAIL',
+      'noreply@brewdigest.com'
+    );
+    this.baseUrl = this.configService.get<string>(
+      'APP_BASE_URL',
+      'http://localhost:3000'
+    );
 
     this.loadTemplates();
   }
@@ -45,7 +53,11 @@ export class EmailService {
         this.templates.set(name, Handlebars.compile(templateSource));
         this.logger.log(`Loaded email template: ${name}`);
       } catch (error) {
-        this.logger.warn(`Could not load template ${name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        this.logger.warn(
+          `Could not load template ${name}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        );
       }
     }
   }
@@ -56,7 +68,7 @@ export class EmailService {
   async sendVerificationEmail(
     to: string,
     name: string,
-    verificationToken: string,
+    verificationToken: string
   ): Promise<void> {
     const template = this.templates.get('verify-email');
     if (!template) {
@@ -81,7 +93,10 @@ export class EmailService {
 
       this.logger.log(`Verification email sent to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send verification email to ${to}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to send verification email to ${to}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -92,7 +107,7 @@ export class EmailService {
   async sendPasswordResetEmail(
     to: string,
     name: string,
-    resetToken: string,
+    resetToken: string
   ): Promise<void> {
     const template = this.templates.get('reset-password');
     if (!template) {
@@ -117,7 +132,10 @@ export class EmailService {
 
       this.logger.log(`Password reset email sent to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${to}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to send password reset email to ${to}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -146,7 +164,10 @@ export class EmailService {
 
       this.logger.log(`No content email sent to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send no content email to ${to}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to send no content email to ${to}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -157,7 +178,7 @@ export class EmailService {
   async sendDigestEmail(
     to: string,
     subject: string,
-    html: string,
+    html: string
   ): Promise<void> {
     try {
       await this.resend.emails.send({
@@ -169,7 +190,10 @@ export class EmailService {
 
       this.logger.log(`Digest email sent to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send digest email to ${to}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to send digest email to ${to}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -193,7 +217,9 @@ export class EmailService {
       });
     };
 
-    const subject = `🍺 Your Brewery Digest: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`;
+    const subject = `🍺 Your Brewery Digest: ${formatDate(
+      periodStart
+    )} - ${formatDate(periodEnd)}`;
 
     try {
       const response = await this.resend.emails.send({
@@ -209,7 +235,7 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         `Failed to send digest to ${to}`,
-        error instanceof Error ? error.stack : undefined,
+        error instanceof Error ? error.stack : undefined
       );
       throw error;
     }

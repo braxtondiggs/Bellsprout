@@ -9,6 +9,7 @@ import { DigestDeliveryProcessor } from './jobs/digest-delivery.processor';
 import { DigestScheduler } from './schedulers/digest.scheduler';
 import { EmailModule } from '../email/email.module';
 import { QueueName } from '../../common/queues/queue.config';
+import { LoggerModule } from '../../common/services/logger.module';
 
 /**
  * Digest Module
@@ -22,10 +23,9 @@ import { QueueName } from '../../common/queues/queue.config';
  */
 @Module({
   imports: [
-    // Register digest queue
     BullModule.registerQueue({ name: QueueName.DIGEST }),
-    // Import EmailModule for sending
     EmailModule,
+    LoggerModule,
   ],
   providers: [
     DigestService,

@@ -19,37 +19,59 @@ services:
       # Redis
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
       # Email (Resend)
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
 
-      # Anthropic (Claude)
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
 
       # Application
       NODE_ENV: production
       APP_BASE_URL: ${APP_BASE_URL}
       PORT: 3000
+      FRONTEND_URL: ${FRONTEND_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
 
       # JWT/Auth
       JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
 
-      # S3/MinIO (optional)
-      S3_ENDPOINT: ${S3_ENDPOINT}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_BUCKET: ${S3_BUCKET}
+      # MinIO/S3 Storage (optional)
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-brewery-assets}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-}
+
+      # Resend Webhook
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET}
+
+      # Scraping Rate Limits (hours between scrapes)
+      INSTAGRAM_RATE_LIMIT_HOURS: ${INSTAGRAM_RATE_LIMIT_HOURS:-1}
+      FACEBOOK_RATE_LIMIT_HOURS: ${FACEBOOK_RATE_LIMIT_HOURS:-1}
+      RSS_RATE_LIMIT_HOURS: ${RSS_RATE_LIMIT_HOURS:-1}
+
+      # Data Retention
+      CONTENT_RETENTION_MONTHS: ${CONTENT_RETENTION_MONTHS:-12}
+      MINIO_EMAIL_RETENTION_DAYS: ${MINIO_EMAIL_RETENTION_DAYS:-365}
+      MINIO_IMAGE_RETENTION_DAYS: ${MINIO_IMAGE_RETENTION_DAYS:-730}
+      MINIO_DOCUMENT_RETENTION_DAYS: ${MINIO_DOCUMENT_RETENTION_DAYS:-365}
 
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      minio:
         condition: service_healthy
+      # Redis is managed by Coolify as a separate resource
     networks:
       - brewery-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 3s
       start_period: 40s
@@ -74,15 +96,34 @@ services:
     networks:
       - brewery-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: brewery-redis
+  # Redis is managed by Coolify as a separate resource due to Coolify bug with docker-compose Redis
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: brewery-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis_data:/data
+  #   command: redis-server --appendonly yes
+  #   healthcheck:
+  #     test: ['CMD', 'redis-cli', 'ping']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - brewery-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: brewery-minio
     restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
+      - minio_data:/data
+    command: server /data --console-address ":9001"
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -92,7 +133,10 @@ services:
 volumes:
   postgres_data:
     driver: local
-  redis_data:
+  # redis_data managed by Coolify
+  # redis_data:
+  #   driver: local
+  minio_data:
     driver: local
 
 networks:

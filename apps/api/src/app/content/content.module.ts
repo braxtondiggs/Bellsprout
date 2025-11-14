@@ -17,6 +17,7 @@ import { SocialScrapingScheduler } from './schedulers/social-scraping.scheduler'
 import { RSSScrapingScheduler } from './schedulers/rss-scraping.scheduler';
 import { QueueName } from '../../common/queues/queue.config';
 import { StorageModule } from '../../common/storage/storage.module';
+import { LoggerModule } from '../../common/services/logger.module';
 
 /**
  * Content Module
@@ -37,8 +38,8 @@ import { StorageModule } from '../../common/storage/storage.module';
       { name: QueueName.EXTRACT },
       { name: QueueName.DEDUPLICATE }
     ),
-    // Storage module for MinIO
     StorageModule,
+    LoggerModule,
   ],
   providers: [
     ContentService,

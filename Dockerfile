@@ -45,18 +45,15 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
 # Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
+COPY --chown=nestjs:nodejs --from=deps /app/node_modules ./node_modules
+COPY --chown=nestjs:nodejs --from=deps /app/prisma ./prisma
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
+COPY --chown=nestjs:nodejs --from=builder /app/dist ./dist
+COPY --chown=nestjs:nodejs --from=builder /app/package*.json ./
 
 # Copy Prisma schema for migrations
-COPY prisma ./prisma
-
-# Set ownership
-RUN chown -R nestjs:nodejs /app
+COPY --chown=nestjs:nodejs prisma ./prisma
 
 # Switch to non-root user
 USER nestjs

@@ -20,11 +20,10 @@
     "prisma:seed": "node -r @swc-node/register prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "docker:build": "docker build -t brewery-digest-api .",
-    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
-    "docker:down": "docker-compose -f docker/docker-compose.yml down",
-    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
-    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
-    "prepare": "husky"
+    "docker:up": "docker-compose -p brewery-digest -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -p brewery-digest -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -p brewery-digest -f docker/docker-compose.yml logs -f",
+    "docker:prod": "docker-compose -p brewery-digest -f docker-compose.prod.yml up -d"
   },
   "prisma": {
     "seed": "node -r @swc-node/register prisma/seed.ts"
@@ -51,10 +50,12 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.1",
+    "@nestjs/microservices": "^11.1.8",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/schedule": "^6.0.1",
     "@nestjs/swagger": "^11.2.1",
+    "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.19.0",
     "axios": "^1.6.0",
@@ -101,7 +102,7 @@
     "@nx/webpack": "22.0.2",
     "@nx/workspace": "22.0.2",
     "@swc-node/register": "~1.9.1",
-    "@swc/core": "~1.5.7",
+    "@swc/core": "^1.15.1",
     "@swc/helpers": "~0.5.11",
     "@types/bcrypt": "^6.0.0",
     "@types/html-minifier": "^4.0.6",

@@ -1,4 +1,4 @@
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Type, Transform } from 'class-transformer';
 import {
   IsString,
   IsNumber,
@@ -19,6 +19,7 @@ class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: Environment = Environment.Development;
 
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   PORT = 3000;
@@ -32,6 +33,7 @@ class EnvironmentVariables {
   @IsOptional()
   REDIS_HOST = 'localhost';
 
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   REDIS_PORT = 6379;
@@ -40,6 +42,7 @@ class EnvironmentVariables {
   @IsOptional()
   REDIS_PASSWORD?: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   REDIS_DB = 0;
@@ -59,7 +62,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  EMAIL_FROM = 'noreply@brewdigest.com';
+  RESEND_FROM_EMAIL = 'noreply@brewdigest.com';
 
   @IsString()
   @IsOptional()
@@ -82,6 +85,7 @@ class EnvironmentVariables {
   @IsOptional()
   MINIO_ENDPOINT?: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   MINIO_PORT?: number = 9000;
@@ -94,6 +98,7 @@ class EnvironmentVariables {
   @IsOptional()
   MINIO_SECRET_KEY?: string;
 
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   MINIO_USE_SSL?: boolean = false;
@@ -114,9 +119,7 @@ class EnvironmentVariables {
 }
 
 export function configValidation(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
-  });
+  const validatedConfig = plainToInstance(EnvironmentVariables, config);
 
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
