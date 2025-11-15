@@ -20,6 +20,7 @@ import { AuthModule } from './app/auth/auth.module';
 import { UsersModule } from './app/users/users.module';
 import { EmailModule } from './app/email/email.module';
 import { DigestModule } from './app/digests/digests.module';
+import { HealthModule } from './app/health/health.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { DigestModule } from './app/digests/digests.module';
     UsersModule,
     EmailModule,
     DigestModule,
+    HealthModule,
   ],
   providers: [
     // Global exception filter

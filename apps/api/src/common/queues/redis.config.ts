@@ -15,17 +15,9 @@ export const createRedisConnection = (
   const port = configService.get('REDIS_PORT', 6379);
   const db = configService.get('REDIS_DB', 0);
 
-  logger.log(
-    `Redis config - host: ${host}, port: ${port}, db: ${db}, ` +
-      `password: ${password ? '[SET]' : '[NOT SET]'} (length: ${
-        password?.length || 0
-      })`
-  );
-
   const redisConfig: RedisOptions = {
     host,
     port,
-    // Only include password if it's set
     ...(password && password.length > 0 && { password }),
     db,
     maxRetriesPerRequest: null, // Required for BullMQ
@@ -36,11 +28,6 @@ export const createRedisConnection = (
       return delay;
     },
   };
-
-  logger.log(
-    `Redis connection options - hasPassword: ${!!redisConfig.password}, ` +
-      `password in config: ${redisConfig.password ? 'YES' : 'NO'}`
-  );
 
   return redisConfig;
 };

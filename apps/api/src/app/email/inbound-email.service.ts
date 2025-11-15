@@ -6,6 +6,7 @@ import { LoggerService } from '../../common/services/logger.service';
 import { MinioService } from '../../common/storage/minio.service';
 import { QueueName } from '../../common/queues/queue.config';
 import { ResendInboundPayload } from './dto/resend-inbound.dto';
+import { EmailRendererService } from './email-renderer.service';
 
 @Injectable()
 export class InboundEmailService {
@@ -13,6 +14,7 @@ export class InboundEmailService {
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
     private readonly minio: MinioService,
+    private readonly emailRenderer: EmailRendererService,
     @InjectQueue(QueueName.COLLECT) private readonly collectQueue: Queue
   ) {
     this.logger.setContext(InboundEmailService.name);
@@ -60,8 +62,27 @@ export class InboundEmailService {
         brewery.name
       );
 
+      // Render HTML email as image for OCR processing
+      let emailRenderUrl: string | null = null;
+      if (payload.html) {
+        try {
+          emailRenderUrl = await this.emailRenderer.renderEmailToImage(
+            payload.html,
+            brewery.id,
+            payload.subject || 'no-subject'
+          );
+          this.logger.log(`Rendered email to image: ${emailRenderUrl}`);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to render email HTML, will process without rendering: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`
+          );
+        }
+      }
+
       // Extract images from email HTML and attachments (same as T025)
-      // Now stores attachments in MinIO
+      // Also extracts individual images from the email for targeted OCR
       const images = await this.extractImages(payload, brewery.id);
 
       // Queue for content processing
@@ -73,6 +94,7 @@ export class InboundEmailService {
         html: payload.html || '',
         text: payload.text || '',
         date: new Date(),
+        emailRenderUrl, // Include rendered email screenshot for OCR
         attachments:
           payload.attachments?.map((att) => ({
             filename: att.filename,
@@ -189,8 +211,8 @@ export class InboundEmailService {
         .substring(0, 50);
       const filename = `${timestamp}-${sanitizedSubject}.json`;
 
-      // Store in MinIO: {breweryId}/emails/{filename}
-      const key = `${breweryId}/emails/${filename}`;
+      // Store in MinIO using generateKey (use 'documents' for JSON files)
+      const key = this.minio.generateKey(breweryId, filename, 'documents');
       const buffer = Buffer.from(
         JSON.stringify(emailSnapshot, null, 2),
         'utf-8'
