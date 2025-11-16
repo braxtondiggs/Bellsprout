@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -12,6 +12,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggerService } from './common/services/logger.service';
 import { BullBoardModule } from './common/bull-board/bull-board.module';
 import { StorageModule } from './common/storage/storage.module';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 
 // App modules
 import { ContentModule } from './app/content/content.module';
@@ -72,4 +73,9 @@ import { HealthModule } from './app/health/health.module';
     LoggerService,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply correlation ID middleware to all routes
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

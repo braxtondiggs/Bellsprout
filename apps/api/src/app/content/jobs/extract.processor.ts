@@ -52,7 +52,13 @@ export class ExtractionProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<void> {
-    this.logger.log(`Processing ${job.name} job: ${job.id}`);
+    const startTime = Date.now();
+
+    this.logger.logJobStart(job.name, job.id, {
+      contentItemId: job.data.contentItemId,
+      breweryId: job.data.breweryId,
+      attempt: job.attemptsMade + 1,
+    });
 
     try {
       switch (job.name) {
@@ -62,11 +68,20 @@ export class ExtractionProcessor extends WorkerHost {
         default:
           this.logger.warn(`Unknown job type: ${job.name}`);
       }
+
+      const duration = Date.now() - startTime;
+      this.logger.logJobComplete(job.name, job.id, duration, {
+        contentItemId: job.data.contentItemId,
+        breweryId: job.data.breweryId,
+      });
     } catch (error) {
-      this.logger.error(
-        `Error processing ${job.name} job`,
-        error instanceof Error ? error.stack : String(error)
-      );
+      const duration = Date.now() - startTime;
+      this.logger.logJobFailed(job.name, job.id, error as Error, {
+        contentItemId: job.data.contentItemId,
+        breweryId: job.data.breweryId,
+        attempt: job.attemptsMade + 1,
+        duration,
+      });
       throw error; // Re-throw to trigger retry
     }
   }
@@ -87,9 +102,13 @@ export class ExtractionProcessor extends WorkerHost {
       attachments,
     } = job.data;
 
-    this.logger.log(
-      `Extracting email content for content item ${contentItemId}`
-    );
+    this.logger.logBusinessEvent('extraction-started', {
+      contentItemId,
+      breweryId,
+      sourceType: 'email',
+      hasAttachments: attachments.length > 0,
+      attachmentCount: attachments.length,
+    });
 
     try {
       let processedHtml = html;
@@ -98,16 +117,20 @@ export class ExtractionProcessor extends WorkerHost {
 
       // Step 1: Process images with OCR if present
       if (attachments && attachments.length > 0) {
-        this.logger.log(
-          `Processing ${attachments.length} image attachments with OCR`
-        );
-
         // Filter for images only
         const imageBuffers = attachments
           .filter((att) => att.contentType.startsWith('image/'))
           .map((att) => att.content);
 
         if (imageBuffers.length > 0) {
+          const ocrStartTime = Date.now();
+
+          this.logger.logBusinessEvent('ocr-started', {
+            contentItemId,
+            breweryId,
+            imageCount: imageBuffers.length,
+          });
+
           // Inject OCR text into HTML
           processedHtml = await this.ocrService.injectOCRIntoHTML(
             html,
@@ -129,8 +152,24 @@ export class ExtractionProcessor extends WorkerHost {
             });
           });
 
-          this.logger.log(
-            `OCR extracted text from ${imageBuffers.length} images`
+          const avgConfidence =
+            ocrResults.reduce((sum, r) => sum + r.confidence, 0) /
+            ocrResults.length;
+          const totalWords = ocrResults.reduce(
+            (sum, r) => sum + r.wordCount,
+            0
+          );
+
+          this.logger.logPerformance(
+            'ocr-extraction',
+            Date.now() - ocrStartTime,
+            {
+              contentItemId,
+              breweryId,
+              imagesProcessed: imageBuffers.length,
+              totalWords,
+              avgConfidence: avgConfidence.toFixed(2),
+            }
           );
         }
       }
@@ -139,9 +178,7 @@ export class ExtractionProcessor extends WorkerHost {
       const contentForLLM = processedHtml || processedText;
 
       // Step 2: Extract structured data with LLM
-      this.logger.log(
-        `Running LLM extraction for content item ${contentItemId}`
-      );
+      // Note: LLM extraction logging is handled by llmService itself
 
       const extractionResult = await this.llmService.extractContent({
         content: contentForLLM,
@@ -155,9 +192,12 @@ export class ExtractionProcessor extends WorkerHost {
       });
 
       if (!extractionResult.success) {
-        this.logger.warn(
-          `LLM extraction failed for ${contentItemId}: ${extractionResult.error}`
-        );
+        this.logger.logBusinessEvent('extraction-failed', {
+          contentItemId,
+          breweryId,
+          reason: 'llm-extraction-failed',
+          error: extractionResult.error,
+        });
 
         // Store the error but continue with partial data
         await this.prisma.contentItem.update({
@@ -185,13 +225,16 @@ export class ExtractionProcessor extends WorkerHost {
 
       const extractedData = extractionResult.data!;
 
-      this.logger.log(`LLM extraction successful for ${contentItemId}`, {
+      this.logger.logBusinessEvent('extraction-complete', {
+        contentItemId,
+        breweryId,
         contentType: extractedData.contentType,
         confidence: extractedData.confidence,
         tokensUsed: extractionResult.tokensUsed,
-        beerReleases: extractedData.beerReleases?.length || 0,
-        events: extractedData.events?.length || 0,
-        updates: extractedData.updates?.length || 0,
+        beerReleaseCount: extractedData.beerReleases?.length || 0,
+        eventCount: extractedData.events?.length || 0,
+        updateCount: extractedData.updates?.length || 0,
+        hasOCR: ocrResults.length > 0,
       });
 
       // Step 3: Update content item with all extracted data
@@ -218,21 +261,21 @@ export class ExtractionProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(
-        `Updated content item ${contentItemId} with complete extraction data`
-      );
-
       // Step 4: Queue for deduplication
       await this.deduplicateQueue.add('check-duplicate', {
         contentItemId,
       });
 
-      this.logger.log(`Queued content item ${contentItemId} for deduplication`);
+      this.logger.logBusinessEvent('deduplication-queued', {
+        contentItemId,
+        breweryId,
+      });
     } catch (error) {
-      this.logger.error(
-        `Failed to extract email ${contentItemId}`,
-        error instanceof Error ? error.stack : String(error)
-      );
+      this.logger.logError('email-extraction', error as Error, {
+        contentItemId,
+        breweryId,
+        hasAttachments: attachments.length > 0,
+      });
       throw error;
     }
   }

@@ -28,14 +28,20 @@ export class DigestGenerationProcessor extends WorkerHost {
   constructor(
     private readonly logger: LoggerService,
     private readonly digestGenerator: DigestGeneratorService,
-    @InjectQueue(QueueName.DIGEST) private readonly digestQueue: Queue,
+    @InjectQueue(QueueName.DIGEST) private readonly digestQueue: Queue
   ) {
     super();
     this.logger.setContext(DigestGenerationProcessor.name);
   }
 
   async process(job: Job): Promise<void> {
-    this.logger.log(`Processing ${job.name} job: ${job.id}`);
+    const startTime = Date.now();
+
+    this.logger.logJobStart(job.name, job.id, {
+      userId: job.data.userId,
+      generateAll: job.data.generateAll,
+      attempt: job.attemptsMade + 1,
+    });
 
     try {
       switch (job.name) {
@@ -45,11 +51,20 @@ export class DigestGenerationProcessor extends WorkerHost {
         default:
           this.logger.warn(`Unknown job type: ${job.name}`);
       }
+
+      const duration = Date.now() - startTime;
+      this.logger.logJobComplete(job.name, job.id, duration, {
+        userId: job.data.userId,
+        generateAll: job.data.generateAll,
+      });
     } catch (error) {
-      this.logger.error(
-        `Error processing ${job.name} job`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      const duration = Date.now() - startTime;
+      this.logger.logJobFailed(job.name, job.id, error as Error, {
+        userId: job.data.userId,
+        generateAll: job.data.generateAll,
+        attempt: job.attemptsMade + 1,
+        duration,
+      });
       throw error; // Re-throw to trigger retry
     }
   }
@@ -59,9 +74,12 @@ export class DigestGenerationProcessor extends WorkerHost {
    */
   private async generateDigest(job: Job<GenerateDigestJobData>) {
     const { userId, generateAll } = job.data;
+    const startTime = Date.now();
 
     if (generateAll) {
-      this.logger.log('Generating digests for all users');
+      this.logger.logBusinessEvent('digest-generation-all-started', {
+        jobId: job.id,
+      });
 
       const results = await this.digestGenerator.generateAllDigests();
 
@@ -77,9 +95,12 @@ export class DigestGenerationProcessor extends WorkerHost {
         }
       }
 
-      this.logger.log(
-        `Generated ${results.length} digests, queued ${queuedCount} for sending`,
-      );
+      this.logger.logBusinessEvent('digest-generation-all-complete', {
+        totalUsers: results.length,
+        digestsQueued: queuedCount,
+        emptyDigests: results.filter((r) => r.isEmpty).length,
+        duration: Date.now() - startTime,
+      });
 
       await job.updateProgress({
         total: results.length,
@@ -87,7 +108,10 @@ export class DigestGenerationProcessor extends WorkerHost {
         empty: results.filter((r) => r.isEmpty).length,
       });
     } else if (userId) {
-      this.logger.log(`Generating digest for user ${userId}`);
+      this.logger.logBusinessEvent('digest-generation-started', {
+        userId,
+        jobId: job.id,
+      });
 
       const result = await this.digestGenerator.generateDigestForUser(userId);
 
@@ -98,11 +122,21 @@ export class DigestGenerationProcessor extends WorkerHost {
           userId: result.userId,
         });
 
-        this.logger.log(
-          `Generated digest ${result.digestId} for user ${userId}, queued for sending`,
-        );
+        this.logger.logBusinessEvent('digest-generation-complete', {
+          userId,
+          digestId: result.digestId,
+          contentItemCount: result.contentItemCount,
+          breweryCount: result.breweryCount,
+          queued: true,
+          duration: Date.now() - startTime,
+        });
       } else {
-        this.logger.log(`User ${userId} has no content, skipping digest`);
+        this.logger.logBusinessEvent('digest-generation-empty', {
+          userId,
+          digestId: result.digestId,
+          reason: 'no-content',
+          duration: Date.now() - startTime,
+        });
       }
 
       await job.updateProgress({

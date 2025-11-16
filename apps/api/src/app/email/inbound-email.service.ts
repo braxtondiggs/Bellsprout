@@ -25,18 +25,27 @@ export class InboundEmailService {
    * This replaces the EmailPollerService (T024-T028) with webhook-based approach
    */
   async processInboundEmail(payload: ResendInboundPayload): Promise<void> {
-    this.logger.log(
-      `Received inbound email from: ${payload.from}, subject: ${payload.subject}`
-    );
+    const startTime = Date.now();
+
+    this.logger.logBusinessEvent('inbound-email-received', {
+      from: payload.from,
+      to: payload.to,
+      subject: payload.subject,
+      hasHtml: !!payload.html,
+      hasText: !!payload.text,
+      attachmentCount: payload.attachments?.length || 0,
+    });
 
     try {
       // Identify brewery from sender email (same logic as T026)
       const brewery = await this.identifyBrewery(payload.from);
 
       if (!brewery) {
-        this.logger.warn(
-          `Could not identify brewery from email: ${payload.from}`
-        );
+        this.logger.logBusinessEvent('unknown-sender-detected', {
+          emailAddress: payload.from,
+          subject: payload.subject,
+          to: payload.to,
+        });
 
         // Store in unknown senders table for manual review
         await this.prisma.unknownSender.create({
@@ -47,43 +56,80 @@ export class InboundEmailService {
           },
         });
 
-        this.logger.log(
-          `Stored unknown sender for manual review: ${payload.from}`
-        );
+        this.logger.logBusinessEvent('unknown-sender-stored', {
+          emailAddress: payload.from,
+        });
         return;
       }
 
-      this.logger.log(`Identified brewery: ${brewery.name} (${brewery.id})`);
+      this.logger.logBusinessEvent('brewery-identified', {
+        breweryId: brewery.id,
+        breweryName: brewery.name,
+        from: payload.from,
+      });
 
       // Store complete email snapshot in MinIO for archival
+      const snapshotStartTime = Date.now();
       const emailSnapshotUrl = await this.storeEmailSnapshot(
         payload,
         brewery.id,
         brewery.name
       );
 
+      if (emailSnapshotUrl) {
+        this.logger.logPerformance(
+          'email-snapshot-storage',
+          Date.now() - snapshotStartTime,
+          {
+            breweryId: brewery.id,
+            size: JSON.stringify(payload).length,
+          }
+        );
+      }
+
       // Render HTML email as image for OCR processing
       let emailRenderUrl: string | null = null;
       if (payload.html) {
+        const renderStartTime = Date.now();
         try {
           emailRenderUrl = await this.emailRenderer.renderEmailToImage(
             payload.html,
             brewery.id,
             payload.subject || 'no-subject'
           );
-          this.logger.log(`Rendered email to image: ${emailRenderUrl}`);
-        } catch (error) {
-          this.logger.warn(
-            `Failed to render email HTML, will process without rendering: ${
-              error instanceof Error ? error.message : 'Unknown error'
-            }`
+
+          this.logger.logPerformance(
+            'email-render-to-image',
+            Date.now() - renderStartTime,
+            {
+              breweryId: brewery.id,
+              htmlLength: payload.html.length,
+              success: true,
+            }
           );
+        } catch (error) {
+          this.logger.logError('email-render', error as Error, {
+            breweryId: brewery.id,
+            subject: payload.subject,
+            duration: Date.now() - renderStartTime,
+          });
         }
       }
 
       // Extract images from email HTML and attachments (same as T025)
       // Also extracts individual images from the email for targeted OCR
+      const extractStartTime = Date.now();
       const images = await this.extractImages(payload, brewery.id);
+
+      this.logger.logPerformance(
+        'email-image-extraction',
+        Date.now() - extractStartTime,
+        {
+          breweryId: brewery.id,
+          imageCount: images.length,
+          hasAttachments: (payload.attachments?.length || 0) > 0,
+        }
+      );
 
       // Queue for content processing
       await this.collectQueue.add('process-email', {
@@ -104,12 +150,22 @@ export class InboundEmailService {
           })) || [],
       });
 
-      this.logger.log(`Queued email from ${brewery.name} for processing`);
+      const totalDuration = Date.now() - startTime;
+
+      this.logger.logBusinessEvent('inbound-email-queued', {
+        breweryId: brewery.id,
+        breweryName: brewery.name,
+        from: payload.from,
+        hasRenderedImage: !!emailRenderUrl,
+        imageCount: images.length,
+        duration: totalDuration,
+      });
     } catch (error) {
-      this.logger.error(
-        `Failed to process inbound email from ${payload.from}`,
-        error instanceof Error ? error.stack : undefined
-      );
+      this.logger.logError('inbound-email-processing', error as Error, {
+        from: payload.from,
+        subject: payload.subject,
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }
@@ -155,12 +211,15 @@ export class InboundEmailService {
             },
           });
 
-          this.logger.log(
-            `Auto-created email mapping: ${fromEmail} → ${brewery.name}`
-          );
+          this.logger.logBusinessEvent('email-mapping-created', {
+            breweryId: brewery.id,
+            breweryName: brewery.name,
+            emailAddress: fromEmail,
+            autoCreated: true,
+          });
         } catch (error) {
           // Ignore duplicate key errors
-          this.logger.warn(`Could not create email mapping for ${fromEmail}`);
+          this.logger.debug(`Could not create email mapping for ${fromEmail}`);
         }
         return brewery;
       }
@@ -224,13 +283,18 @@ export class InboundEmailService {
         'application/json'
       );
 
-      this.logger.log(`Stored email snapshot in MinIO: ${key}`);
+      this.logger.logBusinessEvent('email-snapshot-stored', {
+        breweryId,
+        key,
+        size: buffer.length,
+      });
+
       return result.url;
     } catch (error) {
-      this.logger.error(
-        'Failed to store email snapshot in MinIO',
-        error instanceof Error ? error.stack : undefined
-      );
+      this.logger.logError('email-snapshot-storage', error as Error, {
+        breweryId,
+        subject: payload.subject,
+      });
       // Don't throw - email processing should continue even if snapshot storage fails
       return '';
     }
@@ -278,18 +342,36 @@ export class InboundEmailService {
             );
 
             images.push(result.url);
-            this.logger.log(`Stored email attachment in MinIO: ${key}`);
+
+            this.logger.logBusinessEvent('email-attachment-stored', {
+              breweryId,
+              filename: attachment.filename,
+              contentType: attachment.contentType,
+              size: buffer.length,
+              key,
+            });
           } catch (error) {
-            this.logger.error(
-              `Failed to store email attachment: ${attachment.filename}`,
-              error instanceof Error ? error.stack : undefined
-            );
+            this.logger.logError('email-attachment-storage', error as Error, {
+              breweryId,
+              filename: attachment.filename,
+            });
           }
         }
       }
     }
 
-    this.logger.log(`Extracted ${images.length} images from email`);
+    this.logger.logBusinessEvent('email-images-extracted', {
+      breweryId,
+      totalImages: images.length,
+      inlineImages:
+        images.length -
+        (payload.attachments?.filter((a) => a.contentType.startsWith('image/'))
+          .length || 0),
+      attachmentImages:
+        payload.attachments?.filter((a) => a.contentType.startsWith('image/'))
+          .length || 0,
+    });
+
     return images;
   }
 }

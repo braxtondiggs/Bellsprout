@@ -25,14 +25,19 @@ interface CheckDuplicateJobData {
 export class DeduplicateProcessor extends WorkerHost {
   constructor(
     private readonly logger: LoggerService,
-    private readonly deduplicationService: DeduplicationService,
+    private readonly deduplicationService: DeduplicationService
   ) {
     super();
     this.logger.setContext(DeduplicateProcessor.name);
   }
 
   async process(job: Job): Promise<void> {
-    this.logger.log(`Processing ${job.name} job: ${job.id}`);
+    const startTime = Date.now();
+
+    this.logger.logJobStart(job.name, job.id, {
+      contentItemId: job.data.contentItemId,
+      attempt: job.attemptsMade + 1,
+    });
 
     try {
       switch (job.name) {
@@ -42,11 +47,18 @@ export class DeduplicateProcessor extends WorkerHost {
         default:
           this.logger.warn(`Unknown job type: ${job.name}`);
       }
+
+      const duration = Date.now() - startTime;
+      this.logger.logJobComplete(job.name, job.id, duration, {
+        contentItemId: job.data.contentItemId,
+      });
     } catch (error) {
-      this.logger.error(
-        `Error processing ${job.name} job`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      const duration = Date.now() - startTime;
+      this.logger.logJobFailed(job.name, job.id, error as Error, {
+        contentItemId: job.data.contentItemId,
+        attempt: job.attemptsMade + 1,
+        duration,
+      });
       throw error; // Re-throw to trigger retry
     }
   }
@@ -56,28 +68,38 @@ export class DeduplicateProcessor extends WorkerHost {
    */
   private async checkDuplicate(job: Job<CheckDuplicateJobData>) {
     const { contentItemId } = job.data;
+    const startTime = Date.now();
 
-    this.logger.log(`Checking for duplicates: ${contentItemId}`);
+    this.logger.logBusinessEvent('deduplication-started', {
+      contentItemId,
+    });
 
     try {
-      const result =
-        await this.deduplicationService.checkDuplicate(contentItemId);
+      const result = await this.deduplicationService.checkDuplicate(
+        contentItemId
+      );
 
       if (result.isDuplicate && result.duplicateOf) {
         // Mark as duplicate
         await this.deduplicationService.markAsDuplicate(
           contentItemId,
           result.duplicateOf,
-          result.similarity!,
+          result.similarity!
         );
 
-        this.logger.log(
-          `Content ${contentItemId} is a duplicate of ${result.duplicateOf} (similarity: ${result.similarity!.toFixed(2)})`,
-        );
+        this.logger.logBusinessEvent('duplicate-detected', {
+          contentItemId,
+          duplicateOf: result.duplicateOf,
+          similarity: result.similarity!.toFixed(2),
+          candidatesChecked: result.candidatesChecked,
+        });
       } else {
-        this.logger.log(
-          `Content ${contentItemId} is unique (checked ${result.candidatesChecked} candidates)`,
-        );
+        this.logger.logBusinessEvent('deduplication-complete', {
+          contentItemId,
+          isDuplicate: false,
+          candidatesChecked: result.candidatesChecked,
+          duration: Date.now() - startTime,
+        });
       }
 
       // Update job progress
@@ -87,10 +109,10 @@ export class DeduplicateProcessor extends WorkerHost {
         similarity: result.similarity,
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to check duplicate for ${contentItemId}`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.logError('deduplication-check', error as Error, {
+        contentItemId,
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }

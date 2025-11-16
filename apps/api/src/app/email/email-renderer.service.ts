@@ -15,8 +15,11 @@ export class EmailRendererService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    const startTime = Date.now();
+
     try {
-      this.logger.log('Initializing Playwright browser for email rendering...');
+      this.logger.logBusinessEvent('playwright-browser-init-started', {});
+
       this.browser = await chromium.launch({
         headless: true,
         args: [
@@ -26,12 +29,16 @@ export class EmailRendererService implements OnModuleInit, OnModuleDestroy {
           '--disable-gpu',
         ],
       });
-      this.logger.log('Playwright browser initialized successfully');
-    } catch (error) {
-      this.logger.error(
-        'Failed to initialize Playwright browser',
-        error instanceof Error ? error.stack : undefined
+
+      this.logger.logPerformance(
+        'playwright-browser-init',
+        Date.now() - startTime,
+        { success: true }
       );
+    } catch (error) {
+      this.logger.logError('playwright-browser-init', error as Error, {
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }

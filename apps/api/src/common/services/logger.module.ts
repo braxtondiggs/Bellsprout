@@ -10,22 +10,42 @@ import { LoggerService } from './logger.service';
       useFactory: (configService: ConfigService) => {
         const isProduction = configService.get('NODE_ENV') === 'production';
         const logLevel = configService.get('LOG_LEVEL', 'info');
+        const logtailToken = configService.get('LOGTAIL_SOURCE_TOKEN');
+
+        // Determine transport based on environment
+        let transport;
+        if (isProduction && logtailToken) {
+          // Production with Better Stack
+          const logtailEndpoint = configService.get(
+            'LOGTAIL_ENDPOINT',
+            'https://in.logs.betterstack.com'
+          );
+          transport = {
+            target: '@logtail/pino',
+            options: {
+              sourceToken: logtailToken,
+              options: { endpoint: logtailEndpoint },
+            },
+          };
+        } else if (!isProduction) {
+          // Development with pretty printing
+          transport = {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'SYS:standard',
+              ignore: 'pid,hostname',
+              singleLine: false,
+              messageFormat: '{levelLabel} - {msg}',
+            },
+          };
+        }
+        // Production without logtail token: no transport (JSON to stdout)
 
         return {
           pinoHttp: {
             level: logLevel,
-            transport: isProduction
-              ? undefined
-              : {
-                  target: 'pino-pretty',
-                  options: {
-                    colorize: true,
-                    translateTime: 'SYS:standard',
-                    ignore: 'pid,hostname',
-                    singleLine: false,
-                    messageFormat: '{levelLabel} - {msg}',
-                  },
-                },
+            transport,
             serializers: {
               req: (req) => ({
                 id: req.id,

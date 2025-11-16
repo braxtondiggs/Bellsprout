@@ -28,7 +28,7 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly logger: LoggerService,
+    private readonly logger: LoggerService
   ) {
     this.logger.setContext(LLMExtractionService.name);
   }
@@ -36,7 +36,9 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY not configured, LLM extraction disabled');
+      this.logger.warn(
+        'OPENAI_API_KEY not configured, LLM extraction disabled'
+      );
       return;
     }
 
@@ -59,12 +61,14 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    const startTime = Date.now();
+
     try {
       const prompt = this.buildPrompt(input);
 
-      this.logger.debug('Calling OpenAI API for extraction', {
-        model: this.model,
+      this.logger.logBusinessEvent('llm-extraction-started', {
         sourceType: input.sourceType,
+        breweryName: input.breweryName,
         contentLength: input.content.length,
       });
 
@@ -110,7 +114,13 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
                       releaseDate: { type: 'string' },
                       availability: {
                         type: 'string',
-                        enum: ['draft', 'cans', 'bottles', 'limited', 'ongoing'],
+                        enum: [
+                          'draft',
+                          'cans',
+                          'bottles',
+                          'limited',
+                          'ongoing',
+                        ],
                       },
                       price: { type: 'string' },
                     },
@@ -130,7 +140,16 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
                       description: { type: 'string' },
                       eventType: {
                         type: 'string',
-                        enum: ['tasting', 'release', 'food-pairing', 'live-music', 'trivia', 'tour', 'festival', 'other'],
+                        enum: [
+                          'tasting',
+                          'release',
+                          'food-pairing',
+                          'live-music',
+                          'trivia',
+                          'tour',
+                          'festival',
+                          'other',
+                        ],
                       },
                       ticketUrl: { type: 'string' },
                       isFree: { type: 'boolean' },
@@ -149,7 +168,15 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
                       content: { type: 'string' },
                       category: {
                         type: 'string',
-                        enum: ['hours', 'menu', 'announcement', 'tap-list', 'collaboration', 'awards', 'other'],
+                        enum: [
+                          'hours',
+                          'menu',
+                          'announcement',
+                          'tap-list',
+                          'collaboration',
+                          'awards',
+                          'other',
+                        ],
                       },
                       urls: {
                         type: 'array',
@@ -177,10 +204,20 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
       });
 
       const usage = response.usage;
-      this.logger.debug('OpenAI API response received', {
-        tokensUsed: usage?.total_tokens,
-        finishReason: response.choices[0]?.finish_reason,
-      });
+      const apiDuration = Date.now() - startTime;
+
+      this.logger.logExternalCall(
+        'openai',
+        'chat.completions',
+        apiDuration,
+        true,
+        {
+          model: this.model,
+          tokensUsed: usage?.total_tokens,
+          promptTokens: usage?.prompt_tokens,
+          completionTokens: usage?.completion_tokens,
+        }
+      );
 
       const messageContent = response.choices[0]?.message?.content;
 
@@ -200,7 +237,11 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
       } catch (parseError) {
         return {
           success: false,
-          error: `Failed to parse/validate response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+          error: `Failed to parse/validate response: ${
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError)
+          }`,
           tokensUsed: usage?.total_tokens,
         };
       }
@@ -213,17 +254,33 @@ export class LLMExtractionService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
+      const totalDuration = Date.now() - startTime;
+      this.logger.logBusinessEvent('llm-extraction-complete', {
+        sourceType: input.sourceType,
+        contentType: extractedData.contentType,
+        confidence: extractedData.confidence,
+        beerCount: extractedData.beerReleases?.length || 0,
+        eventCount: extractedData.events?.length || 0,
+        updateCount: extractedData.updates?.length || 0,
+        tokensUsed: usage?.total_tokens,
+        duration: totalDuration,
+      });
+
       return {
         success: true,
         data: extractedData,
         tokensUsed: usage?.total_tokens,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `LLM extraction failed: ${errorMessage} (sourceType: ${input.sourceType})`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const duration = Date.now() - startTime;
+
+      this.logger.logError('llm-extraction', error as Error, {
+        sourceType: input.sourceType,
+        breweryName: input.breweryName,
+        duration,
+      });
 
       return {
         success: false,
@@ -321,17 +378,18 @@ Be thorough and accurate. It's better to include too much information than to mi
   /**
    * Batch extract multiple content items
    */
-  async extractBatch(
-    inputs: ExtractionInput[],
-  ): Promise<ExtractionResult[]> {
+  async extractBatch(inputs: ExtractionInput[]): Promise<ExtractionResult[]> {
     this.logger.log(`Starting batch extraction for ${inputs.length} items`);
 
     const results = await Promise.all(
-      inputs.map((input) => this.extractContent(input)),
+      inputs.map((input) => this.extractContent(input))
     );
 
     const successful = results.filter((r) => r.success).length;
-    const totalTokens = results.reduce((sum, r) => sum + (r.tokensUsed || 0), 0);
+    const totalTokens = results.reduce(
+      (sum, r) => sum + (r.tokensUsed || 0),
+      0
+    );
 
     this.logger.log('Batch extraction complete', {
       total: inputs.length,

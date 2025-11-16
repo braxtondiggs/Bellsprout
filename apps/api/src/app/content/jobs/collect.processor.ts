@@ -65,14 +65,19 @@ export class CollectProcessor extends WorkerHost {
     private readonly instagramCollector: InstagramCollectorService,
     private readonly facebookCollector: FacebookCollectorService,
     private readonly rssCollector: RSSCollectorService,
-    @InjectQueue(QueueName.EXTRACT) private readonly extractQueue: Queue,
+    @InjectQueue(QueueName.EXTRACT) private readonly extractQueue: Queue
   ) {
     super();
     this.logger.setContext(CollectProcessor.name);
   }
 
   async process(job: Job): Promise<void> {
-    this.logger.log(`Processing ${job.name} job: ${job.id}`);
+    const startTime = Date.now();
+
+    this.logger.logJobStart(job.name, job.id, {
+      breweryId: job.data.breweryId,
+      attempt: job.attemptsMade + 1,
+    });
 
     try {
       switch (job.name) {
@@ -91,8 +96,18 @@ export class CollectProcessor extends WorkerHost {
         default:
           this.logger.warn(`Unknown job type: ${job.name}`);
       }
+
+      const duration = Date.now() - startTime;
+      this.logger.logJobComplete(job.name, job.id, duration, {
+        breweryId: job.data.breweryId,
+      });
     } catch (error) {
-      this.logger.error(`Error processing ${job.name} job`, error instanceof Error ? error.stack : String(error));
+      const duration = Date.now() - startTime;
+      this.logger.logJobFailed(job.name, job.id, error as Error, {
+        breweryId: job.data.breweryId,
+        attempt: job.attemptsMade + 1,
+        duration,
+      });
       throw error; // Re-throw to trigger retry
     }
   }
@@ -101,9 +116,17 @@ export class CollectProcessor extends WorkerHost {
    * Process email newsletter
    */
   private async processEmail(job: Job<ProcessEmailJobData>) {
-    const { breweryId, messageId, subject, html, text, date, attachments } = job.data;
+    const { breweryId, messageId, subject, html, text, date, attachments } =
+      job.data;
 
-    this.logger.log(`Processing email for brewery ${breweryId}: ${subject}`);
+    this.logger.logBusinessEvent('email-received', {
+      breweryId,
+      messageId,
+      subject,
+      from: job.data.from,
+      hasImages: attachments.length > 0,
+      attachmentCount: attachments.length,
+    });
 
     // Fetch brewery name for LLM context
     const brewery = await this.prisma.brewery.findUnique({
@@ -128,7 +151,12 @@ export class CollectProcessor extends WorkerHost {
       },
     });
 
-    this.logger.log(`Created content item ${contentItem.id} for email`);
+    this.logger.logBusinessEvent('content-stored', {
+      contentItemId: contentItem.id,
+      breweryId,
+      sourceType: 'email',
+      hasAttachments: attachments.length > 0,
+    });
 
     // Queue for extraction
     await this.extractQueue.add('extract-email', {
@@ -143,20 +171,39 @@ export class CollectProcessor extends WorkerHost {
       attachments,
     });
 
-    this.logger.log(`Queued email ${messageId} for extraction`);
+    this.logger.logBusinessEvent('extraction-queued', {
+      contentItemId: contentItem.id,
+      breweryId,
+      sourceType: 'email',
+    });
   }
 
   /**
    * Scrape Instagram posts
    */
   private async scrapeInstagram(job: Job<ScrapeInstagramJobData>) {
-    const { breweryId } = job.data;
+    const { breweryId, instagramHandle } = job.data;
+    const startTime = Date.now();
+
+    this.logger.logBusinessEvent('instagram-scrape-started', {
+      breweryId,
+      instagramHandle,
+    });
 
     // Scrape posts using Instagram collector
     const posts = await this.instagramCollector.scrapeBrewery(breweryId);
+    const scrapeDuration = Date.now() - startTime;
+
+    this.logger.logPerformance('instagram-scrape', scrapeDuration, {
+      breweryId,
+      postsFound: posts.length,
+    });
 
     if (posts.length === 0) {
-      this.logger.log(`No Instagram posts found for brewery ${breweryId}`);
+      this.logger.logBusinessEvent('instagram-no-posts', {
+        breweryId,
+        instagramHandle,
+      });
       return;
     }
 
@@ -176,7 +223,13 @@ export class CollectProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`Created content item ${contentItem.id} from Instagram post`);
+      this.logger.logBusinessEvent('content-stored', {
+        contentItemId: contentItem.id,
+        breweryId,
+        sourceType: 'instagram',
+        postType: post.type,
+        imageCount: post.images.length,
+      });
 
       // Queue for extraction
       await this.extractQueue.add('extract-social', {
@@ -188,28 +241,44 @@ export class CollectProcessor extends WorkerHost {
       });
     }
 
-    this.logger.log(`Processed ${posts.length} Instagram posts for brewery ${breweryId}`);
+    this.logger.logBusinessEvent('instagram-scrape-complete', {
+      breweryId,
+      postsProcessed: posts.length,
+      duration: Date.now() - startTime,
+    });
   }
 
   /**
    * Scrape Facebook posts
    */
   private async scrapeFacebook(job: Job<ScrapeFacebookJobData>) {
-    const { breweryId } = job.data;
+    const { breweryId, facebookHandle } = job.data;
+    const startTime = Date.now();
 
-    // Scrape posts using Facebook collector
+    this.logger.logBusinessEvent('facebook-scrape-started', {
+      breweryId,
+      facebookHandle,
+    });
+
     const posts = await this.facebookCollector.scrapeBrewery(breweryId);
 
+    this.logger.logPerformance('facebook-scrape', Date.now() - startTime, {
+      breweryId,
+      postsFound: posts.length,
+    });
+
     if (posts.length === 0) {
-      this.logger.log(`No Facebook posts found for brewery ${breweryId}`);
+      this.logger.logBusinessEvent('facebook-no-posts', {
+        breweryId,
+        facebookHandle,
+      });
       return;
     }
 
-    // Store each post as a content item
     for (const post of posts) {
       const contentItem = await this.contentService.create({
         breweryId,
-        type: 'update' as any, // Will be categorized by LLM
+        type: 'update' as any,
         sourceType: SourceType.facebook,
         sourceUrl: post.url,
         rawContent: post.content,
@@ -221,9 +290,13 @@ export class CollectProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`Created content item ${contentItem.id} from Facebook post`);
+      this.logger.logBusinessEvent('content-stored', {
+        contentItemId: contentItem.id,
+        breweryId,
+        sourceType: 'facebook',
+        imageCount: post.images.length,
+      });
 
-      // Queue for extraction
       await this.extractQueue.add('extract-social', {
         contentItemId: contentItem.id,
         breweryId,
@@ -233,28 +306,41 @@ export class CollectProcessor extends WorkerHost {
       });
     }
 
-    this.logger.log(`Processed ${posts.length} Facebook posts for brewery ${breweryId}`);
+    this.logger.logBusinessEvent('facebook-scrape-complete', {
+      breweryId,
+      postsProcessed: posts.length,
+      duration: Date.now() - startTime,
+    });
   }
 
   /**
    * Fetch RSS feed items
    */
   private async fetchRSS(job: Job<FetchRSSJobData>) {
-    const { breweryId } = job.data;
+    const { breweryId, rssFeedUrl } = job.data;
+    const startTime = Date.now();
 
-    // Fetch RSS feed items using RSS collector
+    this.logger.logBusinessEvent('rss-fetch-started', {
+      breweryId,
+      rssFeedUrl,
+    });
+
     const items = await this.rssCollector.fetchFeed(breweryId);
 
+    this.logger.logPerformance('rss-fetch', Date.now() - startTime, {
+      breweryId,
+      itemsFound: items.length,
+    });
+
     if (items.length === 0) {
-      this.logger.log(`No RSS items found for brewery ${breweryId}`);
+      this.logger.logBusinessEvent('rss-no-items', { breweryId, rssFeedUrl });
       return;
     }
 
-    // Store each RSS item as a content item
     for (const item of items) {
       const contentItem = await this.contentService.create({
         breweryId,
-        type: 'update' as any, // Will be categorized by LLM
+        type: 'update' as any,
         sourceType: SourceType.rss,
         sourceUrl: item.link,
         rawContent: item.content,
@@ -266,9 +352,13 @@ export class CollectProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`Created content item ${contentItem.id} from RSS item`);
+      this.logger.logBusinessEvent('content-stored', {
+        contentItemId: contentItem.id,
+        breweryId,
+        sourceType: 'rss',
+        title: item.title,
+      });
 
-      // Queue for extraction
       await this.extractQueue.add('extract-rss', {
         contentItemId: contentItem.id,
         breweryId,
@@ -279,6 +369,10 @@ export class CollectProcessor extends WorkerHost {
       });
     }
 
-    this.logger.log(`Processed ${items.length} RSS items for brewery ${breweryId}`);
+    this.logger.logBusinessEvent('rss-fetch-complete', {
+      breweryId,
+      itemsProcessed: items.length,
+      duration: Date.now() - startTime,
+    });
   }
 }

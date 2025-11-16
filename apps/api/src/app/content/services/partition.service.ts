@@ -11,12 +11,12 @@ export class PartitionService implements OnModuleInit {
   constructor(
     private readonly logger: LoggerService,
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService
   ) {
     this.logger.setContext(PartitionService.name);
     this.retentionMonths = this.config.get<number>(
       'CONTENT_RETENTION_MONTHS',
-      12,
+      12
     );
   }
 
@@ -49,7 +49,7 @@ export class PartitionService implements OnModuleInit {
 
       if (partitionsCreated.length > 0) {
         this.logger.log(
-          `Ensured partitions exist: ${partitionsCreated.join(', ')}`,
+          `Ensured partitions exist: ${partitionsCreated.join(', ')}`
         );
       } else {
         this.logger.debug('All required partitions already exist');
@@ -57,7 +57,7 @@ export class PartitionService implements OnModuleInit {
     } catch (error) {
       this.logger.error(
         'Failed to ensure current partitions',
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
     }
   }
@@ -68,10 +68,12 @@ export class PartitionService implements OnModuleInit {
    */
   async createPartition(year: number, month: number): Promise<string | null> {
     try {
-      const result = await this.prisma.$queryRawUnsafe<{ create_content_partition: string }[]>(
-        'SELECT create_content_partition($1, $2) as create_content_partition',
+      const result = await this.prisma.$queryRawUnsafe<
+        { create_content_partition: string }[]
+      >(
+        'SELECT create_content_partition($1::int, $2::int) as create_content_partition',
         year,
-        month,
+        month
       );
 
       const partitionName = result[0]?.create_content_partition;
@@ -84,17 +86,14 @@ export class PartitionService implements OnModuleInit {
       return null;
     } catch (error) {
       // Partition might already exist - this is okay
-      if (
-        error instanceof Error &&
-        error.message.includes('already exists')
-      ) {
+      if (error instanceof Error && error.message.includes('already exists')) {
         this.logger.debug(`Partition already exists for ${year}-${month}`);
         return null;
       }
 
       this.logger.error(
         `Failed to create partition for ${year}-${month}`,
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
       throw error;
     }
@@ -113,7 +112,7 @@ export class PartitionService implements OnModuleInit {
     } catch (error) {
       this.logger.error(
         'Monthly partition creation failed',
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
     }
   }
@@ -125,13 +124,15 @@ export class PartitionService implements OnModuleInit {
   @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async cleanupOldPartitions(): Promise<void> {
     this.logger.log(
-      `Running partition cleanup (${this.retentionMonths} month retention)`,
+      `Running partition cleanup (${this.retentionMonths} month retention)`
     );
 
     try {
-      const result = await this.prisma.$queryRawUnsafe<{ drop_old_content_partitions: string }[]>(
-        'SELECT drop_old_content_partitions($1) as drop_old_content_partitions',
-        this.retentionMonths,
+      const result = await this.prisma.$queryRawUnsafe<
+        { drop_old_content_partitions: string }[]
+      >(
+        'SELECT drop_old_content_partitions($1::int) as drop_old_content_partitions',
+        this.retentionMonths
       );
 
       const droppedPartitions = result
@@ -140,7 +141,9 @@ export class PartitionService implements OnModuleInit {
 
       if (droppedPartitions.length > 0) {
         this.logger.log(
-          `Dropped ${droppedPartitions.length} old partitions: ${droppedPartitions.join(', ')}`,
+          `Dropped ${
+            droppedPartitions.length
+          } old partitions: ${droppedPartitions.join(', ')}`
         );
       } else {
         this.logger.debug('No old partitions to clean up');
@@ -148,7 +151,7 @@ export class PartitionService implements OnModuleInit {
     } catch (error) {
       this.logger.error(
         'Partition cleanup failed',
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
     }
   }

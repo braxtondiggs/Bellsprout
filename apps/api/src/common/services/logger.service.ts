@@ -72,4 +72,151 @@ export class LoggerService {
     (childLogger as any).logger = this.logger.logger.child(bindings);
     return childLogger;
   }
+
+  /**
+   * Log a job start event with structured metadata
+   */
+  logJobStart(
+    jobName: string,
+    jobId = 'unknown',
+    metadata?: Record<string, any>
+  ) {
+    this.logger.info(
+      {
+        event: 'job.start',
+        jobName,
+        jobId,
+        ...metadata,
+      },
+      `Job started: ${jobName}`
+    );
+  }
+
+  /**
+   * Log a job completion event with duration and result
+   */
+  logJobComplete(
+    jobName: string,
+    jobId = 'unknown',
+    duration: number,
+    result?: Record<string, any>
+  ) {
+    this.logger.info(
+      {
+        event: 'job.complete',
+        jobName,
+        jobId,
+        duration,
+        ...result,
+      },
+      `Job completed: ${jobName} (${duration}ms)`
+    );
+  }
+
+  /**
+   * Log a job failure event with error details
+   */
+  logJobFailed(
+    jobName: string,
+    jobId = 'unknown',
+    error: Error,
+    metadata?: Record<string, any>
+  ) {
+    this.logger.error(
+      {
+        event: 'job.failed',
+        jobName,
+        jobId,
+        error: {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+        },
+        ...metadata,
+      },
+      `Job failed: ${jobName} - ${error.message}`
+    );
+  }
+
+  /**
+   * Log a business event with structured metadata
+   */
+  logBusinessEvent(
+    eventName: string,
+    metadata: Record<string, any>,
+    message?: string
+  ) {
+    this.logger.info(
+      {
+        event: `business.${eventName}`,
+        ...metadata,
+      },
+      message || eventName
+    );
+  }
+
+  /**
+   * Log a performance metric
+   */
+  logPerformance(
+    operation: string,
+    duration: number,
+    metadata?: Record<string, any>
+  ) {
+    this.logger.info(
+      {
+        event: 'performance',
+        operation,
+        duration,
+        ...metadata,
+      },
+      `${operation} completed in ${duration}ms`
+    );
+  }
+
+  /**
+   * Log an external service call
+   */
+  logExternalCall(
+    service: string,
+    operation: string,
+    duration: number,
+    success: boolean,
+    metadata?: Record<string, any>
+  ) {
+    const level = success ? 'info' : 'warn';
+    this.logger[level](
+      {
+        event: 'external.call',
+        service,
+        operation,
+        duration,
+        success,
+        ...metadata,
+      },
+      `${service}.${operation} ${
+        success ? 'succeeded' : 'failed'
+      } (${duration}ms)`
+    );
+  }
+
+  /**
+   * Log an enhanced error with full context
+   */
+  logError(operation: string, error: Error, metadata?: Record<string, any>) {
+    this.logger.error(
+      {
+        event: 'error',
+        operation,
+        error: {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+          code: (error as any).code,
+        },
+        ...metadata,
+      },
+      `Error in ${operation}: ${error.message}`
+    );
+  }
 }
