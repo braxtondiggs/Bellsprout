@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Param, Query, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { BreweriesService } from './breweries.service';
 import { BreweryFilterDto } from './dto/brewery-filter.dto';
 import { BreweryResponseDto } from './dto/brewery-response.dto';
@@ -24,7 +11,9 @@ export class BreweriesController {
   constructor(private readonly breweriesService: BreweriesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all breweries with optional filtering and pagination' })
+  @ApiOperation({
+    summary: 'List all breweries with optional filtering and pagination',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of breweries returned successfully',
@@ -32,7 +21,7 @@ export class BreweriesController {
   })
   async findAll(
     @Query() filter: BreweryFilterDto,
-    @Request() req?: any,
+    @Request() req?: any
   ): Promise<PaginatedBreweryResponseDto> {
     const userId = req?.user?.id;
     return this.breweriesService.findAll(filter, userId);
@@ -48,7 +37,7 @@ export class BreweriesController {
   })
   async search(
     @Query('q') query: string,
-    @Request() req?: any,
+    @Request() req?: any
   ): Promise<BreweryResponseDto[]> {
     const userId = req?.user?.id;
     return this.breweriesService.search(query, userId);
@@ -67,7 +56,7 @@ export class BreweriesController {
   })
   async findOne(
     @Param('id') id: string,
-    @Request() req?: any,
+    @Request() req?: any
   ): Promise<BreweryResponseDto> {
     const userId = req?.user?.id;
     return this.breweriesService.findOne(id, userId);

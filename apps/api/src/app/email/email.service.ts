@@ -203,12 +203,11 @@ export class EmailService {
    */
   async sendDigest(params: {
     to: string;
-    userName: string;
     digestHtml: string;
     periodStart: Date;
     periodEnd: Date;
   }): Promise<void> {
-    const { to, userName, digestHtml, periodStart, periodEnd } = params;
+    const { to, digestHtml, periodStart, periodEnd } = params;
 
     const formatDate = (date: Date) => {
       return date.toLocaleDateString('en-US', {

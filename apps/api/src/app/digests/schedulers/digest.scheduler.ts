@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { LoggerService } from '../../../common/services/logger.service';
@@ -16,7 +16,7 @@ import { QueueName } from '../../../common/queues/queue.config';
 export class DigestScheduler {
   constructor(
     private readonly logger: LoggerService,
-    @InjectQueue(QueueName.DIGEST) private readonly digestQueue: Queue,
+    @InjectQueue(QueueName.DIGEST) private readonly digestQueue: Queue
   ) {
     this.logger.setContext(DigestScheduler.name);
   }
@@ -43,7 +43,7 @@ export class DigestScheduler {
     } catch (error) {
       this.logger.error(
         'Failed to queue weekly digest generation',
-        error instanceof Error ? error.stack : undefined,
+        error instanceof Error ? error.stack : undefined
       );
     }
   }
@@ -55,7 +55,7 @@ export class DigestScheduler {
     this.logger.log(
       userId
         ? `Manually triggering digest for user ${userId}`
-        : 'Manually triggering digest for all users',
+        : 'Manually triggering digest for all users'
     );
 
     await this.digestQueue.add('generate-digest', {

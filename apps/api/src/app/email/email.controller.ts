@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { ResendInboundPayload } from './dto/resend-inbound.dto';
+import type { ResendInboundPayload } from './dto/resend-inbound.dto';
 import { InboundEmailService } from './inbound-email.service';
 import { BounceHandlerService } from './bounce-handler.service';
 import { Public } from '../auth/decorators/public.decorator';

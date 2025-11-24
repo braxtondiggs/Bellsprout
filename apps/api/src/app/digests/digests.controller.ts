@@ -1,7 +1,13 @@
-import { Controller, Get, Param, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { DigestService } from './digests.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { DigestFilterDto } from './dto/digest-response.dto';
 
 /**
  * Digest Controller
@@ -20,7 +26,7 @@ export class DigestController {
   async getUserDigests(
     @Request() req: any,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('offset') offset?: string
   ) {
     const userId = req.user.userId;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
@@ -29,7 +35,7 @@ export class DigestController {
     return await this.digestService.getUserDigests(
       userId,
       parsedLimit,
-      parsedOffset,
+      parsedOffset
     );
   }
 

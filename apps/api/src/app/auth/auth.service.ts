@@ -2,7 +2,6 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
-  NotFoundException,
   BadRequestException,
   Inject,
   forwardRef,
@@ -26,7 +25,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly logger: LoggerService,
     @Inject(forwardRef(() => EmailService))
-    private readonly emailService: EmailService,
+    private readonly emailService: EmailService
   ) {
     this.logger.setContext(AuthService.name);
   }
@@ -76,15 +75,19 @@ export class AuthService {
       await this.emailService.sendVerificationEmail(
         user.email,
         firstName,
-        emailVerificationToken,
+        emailVerificationToken
       );
     } catch (error) {
-      this.logger.error('Failed to send verification email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Failed to send verification email',
+        error instanceof Error ? error.stack : undefined
+      );
       // Don't fail registration if email fails
     }
 
     return {
-      message: 'Registration successful. Please check your email to verify your account.',
+      message:
+        'Registration successful. Please check your email to verify your account.',
     };
   }
 
@@ -166,7 +169,8 @@ export class AuthService {
     if (!user) {
       // Don't reveal if email exists
       return {
-        message: 'If your email is registered, you will receive a password reset link.',
+        message:
+          'If your email is registered, you will receive a password reset link.',
       };
     }
 
@@ -190,22 +194,29 @@ export class AuthService {
       await this.emailService.sendPasswordResetEmail(
         user.email,
         fullName,
-        resetToken,
+        resetToken
       );
     } catch (error) {
-      this.logger.error('Failed to send password reset email', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Failed to send password reset email',
+        error instanceof Error ? error.stack : undefined
+      );
       // Don't fail request if email fails
     }
 
     return {
-      message: 'If your email is registered, you will receive a password reset link.',
+      message:
+        'If your email is registered, you will receive a password reset link.',
     };
   }
 
   /**
    * Reset password with token
    */
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    token: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
     const user = await this.prisma.user.findFirst({
       where: {
         passwordResetToken: token,

@@ -59,15 +59,7 @@ export class BounceHandlerService {
 
       if (bounceType === 'hard') {
         // Hard bounce: Pause immediately and record
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            subscriptionStatus: 'paused',
-            bounceCount: { increment: 1 },
-            lastBounceAt: new Date(),
-            lastBounceType: 'hard',
-          },
-        });
+        await this.pauseUserSubscription(user.id, email, 'hard-bounce');
 
         this.logger.warn(`Hard bounce for ${email} - subscription paused`);
       } else {
@@ -90,49 +82,16 @@ export class BounceHandlerService {
 
         // Pause subscription if threshold reached
         if (updatedUser.bounceCount >= this.SOFT_BOUNCE_THRESHOLD) {
-          await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-              subscriptionStatus: 'paused',
-            },
-          });
-
-          this.logger.warn(
-            `Soft bounce threshold reached for ${email} - subscription paused`
+          await this.pauseUserSubscription(
+            user.id,
+            email,
+            'soft-bounce-threshold'
           );
         }
       }
     } catch (error) {
       this.logger.error(
         `Failed to handle bounce for ${email}`,
-        error instanceof Error ? error.stack : String(error)
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Pause user's digest subscription
-   */
-  private async pauseUserSubscription(
-    userId: string,
-    email: string,
-    reason: string
-  ): Promise<void> {
-    try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          subscriptionStatus: 'paused',
-        },
-      });
-
-      this.logger.warn(
-        `Paused digest subscription for ${email} - Reason: ${reason}`
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to pause subscription for ${email}`,
         error instanceof Error ? error.stack : String(error)
       );
       throw error;
@@ -189,5 +148,28 @@ export class BounceHandlerService {
       isPaused: user.subscriptionStatus === 'paused',
       isNearThreshold: user.bounceCount >= this.SOFT_BOUNCE_THRESHOLD - 1,
     };
+  }
+
+  /**
+   * TODO: expand pause handling (notify user, reason codes, audit trail).
+   */
+  private async pauseUserSubscription(
+    userId: string,
+    email: string,
+    reason: string
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionStatus: 'paused',
+        bounceCount: { increment: 1 },
+        lastBounceAt: new Date(),
+        lastBounceType: reason.includes('hard') ? 'hard' : 'soft',
+      },
+    });
+
+    this.logger.warn(
+      `Paused digest subscription for ${email} - Reason: ${reason}`
+    );
   }
 }

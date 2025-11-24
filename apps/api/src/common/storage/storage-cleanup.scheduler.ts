@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
 import { StorageCleanupService } from './storage-cleanup.service';
 import { LoggerService } from '../services/logger.service';
 
@@ -11,18 +10,11 @@ import { LoggerService } from '../services/logger.service';
  */
 @Injectable()
 export class StorageCleanupScheduler {
-  private readonly cronExpression: string;
-
   constructor(
-    private readonly config: ConfigService,
     private readonly cleanupService: StorageCleanupService,
     private readonly logger: LoggerService
   ) {
     this.logger.setContext(StorageCleanupScheduler.name);
-    this.cronExpression = this.config.get<string>(
-      'CRON_MINIO_CLEANUP',
-      '0 2 * * *'
-    );
   }
 
   /**

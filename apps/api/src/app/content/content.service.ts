@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
 import { LoggerService } from '../../common/services/logger.service';
-import { ContentType, SourceType, Prisma } from '@prisma/client';
+import { ContentType, Prisma } from '@prisma/client';
 import { CreateContentItemDto } from './dto/create-content-item.dto';
 
 /**

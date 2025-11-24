@@ -6,15 +6,46 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
       "options": {
-        "command": "webpack-cli build",
-        "args": ["--node-env=production"],
-        "cwd": "apps/api"
+        "target": "node",
+        "compiler": "tsc",
+        "main": "apps/api/src/main.ts",
+        "tsConfig": "apps/api/tsconfig.app.json",
+        "outputPath": "dist/apps/api",
+        "webpackConfig": "apps/api/webpack.config.js",
+        "assets": [
+          "apps/api/src/assets",
+          {
+            "input": "apps/api/src/app/email/templates",
+            "glob": "**/*.hbs",
+            "output": "templates"
+          },
+          {
+            "input": "apps/api/src/app/digests/templates",
+            "glob": "**/*.mjml",
+            "output": "templates/digests"
+          },
+          {
+            "input": "apps/api/src/app/digests/partials",
+            "glob": "**/*.hbs",
+            "output": "templates/digests/partials"
+          }
+        ],
+        "sourceMap": true,
+        "optimization": false,
+        "outputHashing": "none",
+        "generatePackageJson": true,
+        "externalDependencies": "all"
       },
       "configurations": {
         "development": {
-          "args": ["--node-env=development"]
+          "sourceMap": true
+        },
+        "production": {
+          "sourceMap": false,
+          "optimization": true
         }
       }
     },
@@ -50,14 +81,17 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "api:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": true,
+        "host": "0.0.0.0",
+        "port": 3000
       },
       "configurations": {
         "development": {
           "buildTarget": "api:build:development"
         },
         "production": {
-          "buildTarget": "api:build:production"
+          "buildTarget": "api:build:production",
+          "watch": false
         }
       }
     },

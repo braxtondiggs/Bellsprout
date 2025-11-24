@@ -1,4 +1,4 @@
-import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
+import { WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable } from '@nestjs/common';
 import { LoggerService } from '../../../common/services/logger.service';
@@ -15,7 +15,7 @@ import { FailedJobService } from '../services/failed-job.service';
 export class DLQProcessor extends WorkerHost {
   constructor(
     private readonly logger: LoggerService,
-    private readonly failedJobService: FailedJobService,
+    private readonly failedJobService: FailedJobService
   ) {
     super();
     this.logger.setContext(DLQProcessor.name);
@@ -39,7 +39,7 @@ export class DLQProcessor extends WorkerHost {
     if (currentAttempt >= maxAttempts) {
       this.logger.error(
         `Job permanently failed after ${currentAttempt} attempts: ${job.name} (${job.id})`,
-        error.stack,
+        error.stack
       );
 
       // Record in database
@@ -53,7 +53,7 @@ export class DLQProcessor extends WorkerHost {
       });
     } else {
       this.logger.warn(
-        `Job failed (attempt ${currentAttempt}/${maxAttempts}): ${job.name} (${job.id}) - will retry`,
+        `Job failed (attempt ${currentAttempt}/${maxAttempts}): ${job.name} (${job.id}) - will retry`
       );
     }
   }
@@ -63,9 +63,7 @@ export class DLQProcessor extends WorkerHost {
    */
   @OnWorkerEvent('completed')
   async onJobCompleted(job: Job): Promise<void> {
-    this.logger.debug(
-      `Job completed: ${job.name} (${job.id})`,
-    );
+    this.logger.debug(`Job completed: ${job.name} (${job.id})`);
   }
 
   /**
@@ -73,9 +71,7 @@ export class DLQProcessor extends WorkerHost {
    */
   @OnWorkerEvent('active')
   async onJobActive(job: Job): Promise<void> {
-    this.logger.debug(
-      `Job started: ${job.name} (${job.id})`,
-    );
+    this.logger.debug(`Job started: ${job.name} (${job.id})`);
   }
 
   /**

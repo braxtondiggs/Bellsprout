@@ -9,7 +9,12 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,7 +23,7 @@ import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
 @ApiTags('users')
-@Controller('api/users')
+@Controller('users')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class UsersController {
@@ -44,7 +49,7 @@ export class UsersController {
   })
   async updateProfile(
     @Request() req: any,
-    @Body() updateUserDto: UpdateUserDto,
+    @Body() updateUserDto: UpdateUserDto
   ): Promise<UserResponseDto> {
     return this.usersService.updateProfile(req.user.id, updateUserDto);
   }
@@ -57,7 +62,7 @@ export class UsersController {
   })
   async changeEmail(
     @Request() req: any,
-    @Body() changeEmailDto: ChangeEmailDto,
+    @Body() changeEmailDto: ChangeEmailDto
   ): Promise<{ message: string }> {
     return this.usersService.changeEmail(req.user.id, changeEmailDto.newEmail);
   }
@@ -71,11 +76,11 @@ export class UsersController {
   })
   async updateSubscription(
     @Request() req: any,
-    @Body() updateSubscriptionDto: UpdateSubscriptionDto,
+    @Body() updateSubscriptionDto: UpdateSubscriptionDto
   ): Promise<UserResponseDto> {
     return this.usersService.updateSubscriptionStatus(
       req.user.id,
-      updateSubscriptionDto.status,
+      updateSubscriptionDto.status
     );
   }
 
@@ -87,7 +92,7 @@ export class UsersController {
   })
   async subscribeToBrewery(
     @Request() req: any,
-    @Param('breweryId') breweryId: string,
+    @Param('breweryId') breweryId: string
   ): Promise<{ message: string }> {
     return this.usersService.subscribeToBrewery(req.user.id, breweryId);
   }
@@ -100,7 +105,7 @@ export class UsersController {
   })
   async unsubscribeFromBrewery(
     @Request() req: any,
-    @Param('breweryId') breweryId: string,
+    @Param('breweryId') breweryId: string
   ): Promise<{ message: string }> {
     return this.usersService.unsubscribeFromBrewery(req.user.id, breweryId);
   }

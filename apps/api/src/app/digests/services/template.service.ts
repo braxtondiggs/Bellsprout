@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { LoggerService } from '../../../common/services/logger.service';
 import * as Handlebars from 'handlebars';
 import mjml2html from 'mjml';
@@ -64,10 +63,7 @@ export class TemplateService {
   private handlebars: typeof Handlebars;
   private templateCache: Map<string, HandlebarsTemplateDelegate> = new Map();
 
-  constructor(
-    private readonly config: ConfigService,
-    private readonly logger: LoggerService,
-  ) {
+  constructor(private readonly logger: LoggerService) {
     this.logger.setContext(TemplateService.name);
     this.handlebars = Handlebars.create();
     this.registerHelpers();
@@ -100,11 +96,14 @@ export class TemplateService {
     });
 
     // Truncate text helper
-    this.handlebars.registerHelper('truncate', (text: string, length: number) => {
-      if (!text) return '';
-      if (text.length <= length) return text;
-      return text.substring(0, length) + '...';
-    });
+    this.handlebars.registerHelper(
+      'truncate',
+      (text: string, length: number) => {
+        if (!text) return '';
+        if (text.length <= length) return text;
+        return text.substring(0, length) + '...';
+      }
+    );
 
     // Uppercase helper
     this.handlebars.registerHelper('uppercase', (text: string) => {
@@ -136,15 +135,20 @@ export class TemplateService {
     });
 
     // Pluralize helper
-    this.handlebars.registerHelper('pluralize', (count: number, singular: string, plural: string) => {
-      return count === 1 ? singular : plural;
-    });
+    this.handlebars.registerHelper(
+      'pluralize',
+      (count: number, singular: string, plural: string) => {
+        return count === 1 ? singular : plural;
+      }
+    );
   }
 
   /**
    * Load and compile MJML template
    */
-  private async loadTemplate(templateName: string): Promise<HandlebarsTemplateDelegate> {
+  private async loadTemplate(
+    templateName: string
+  ): Promise<HandlebarsTemplateDelegate> {
     // Check cache
     const cached = this.templateCache.get(templateName);
     if (cached) {
@@ -156,7 +160,7 @@ export class TemplateService {
       __dirname,
       '..',
       'templates',
-      `${templateName}.mjml`,
+      `${templateName}.mjml`
     );
 
     this.logger.debug(`Loading template: ${templatePath}`);
@@ -190,7 +194,7 @@ export class TemplateService {
       __dirname,
       '..',
       'partials',
-      `${partialName}.hbs`,
+      `${partialName}.hbs`
     );
 
     this.logger.debug(`Loading partial: ${partialPath}`);
@@ -240,7 +244,7 @@ export class TemplateService {
     } catch (error) {
       this.logger.error(
         'Failed to render digest template',
-        error instanceof Error ? error.stack : String(error),
+        error instanceof Error ? error.stack : String(error)
       );
       throw error;
     }
