@@ -15,3 +15,11 @@ export interface ResendAttachment {
   contentType: string;
   size: number;
 }
+
+/**
+ * Resend sends webhooks wrapped in a type/data structure
+ */
+export interface ResendWebhookPayload {
+  type: string;
+  data: ResendInboundPayload;
+}

@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import type { ResendInboundPayload } from './dto/resend-inbound.dto';
+import type {
+  ResendInboundPayload,
+  ResendWebhookPayload,
+} from './dto/resend-inbound.dto';
 import { InboundEmailService } from './inbound-email.service';
 import { BounceHandlerService } from './bounce-handler.service';
 import { Public } from '../auth/decorators/public.decorator';
@@ -30,7 +33,7 @@ export class EmailController {
   })
   @ApiResponse({ status: 401, description: 'Invalid webhook signature' })
   async handleInboundEmail(
-    @Body() payload: ResendInboundPayload,
+    @Body() payload: ResendWebhookPayload,
     @Headers('svix-signature') signature?: string
   ): Promise<{ success: boolean }> {
     // Verify webhook signature for security
@@ -48,7 +51,15 @@ export class EmailController {
       }
     }
 
-    await this.inboundEmailService.processInboundEmail(payload);
+    // Resend sends webhooks in format: { type: 'email.received', data: {...} }
+    const emailData: ResendInboundPayload | undefined = payload.data;
+
+    // Validate required fields exist
+    if (!emailData?.from) {
+      return { success: true }; // Ignore malformed payloads gracefully
+    }
+
+    await this.inboundEmailService.processInboundEmail(emailData);
 
     return { success: true };
   }
